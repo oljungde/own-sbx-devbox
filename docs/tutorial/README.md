@@ -26,8 +26,9 @@ docker --version
 git --version
 ```
 
-Rechne mit rund **10 GB freiem Plattenplatz**: Das Image ist etwa 6 GB, und beim
-Übertragen in den `sbx`-Store entsteht kurzzeitig eine gleich große tar-Datei.
+Rechne mit rund **8 GB freiem Plattenplatz**: Das Image belegt etwa 5,9 GB, und
+beim Übertragen in den `sbx`-Store entsteht kurzzeitig eine tar-Datei von rund
+1,4 GB (komprimiert).
 
 ## Wenn du feststeckst
 

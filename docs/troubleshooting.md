@@ -94,6 +94,18 @@ docker run --rm devbox/base:latest bash -lc 'pnpm --version'
 
 ---
 
+## „Safe-chain: User defined SSL_CERT_FILE found … It will be overwritten"
+
+Kein Fehler. Safe Chain arbeitet als lokaler Proxy und muss dafür die
+TLS-Zertifikate umbiegen — die Meldung erscheint bei jedem `uv`- oder
+`npm`-Aufruf. Wenn sie stört:
+
+```bash
+DEVBOX_SAFE_CHAIN=0 uv sync
+```
+
+---
+
 ## `npm install safe-chain-test` wird nicht blockiert
 
 Der Schutz ist nicht aktiv. Prüfen, ob das Shim-Verzeichnis vorne im PATH steht:
@@ -154,14 +166,48 @@ dann hilft nur `rm` + `up`.
 
 ---
 
+## Globale Skills fehlen, obwohl `agents` und `commands` da sind
+
+Das ist so gewollt. `sbx` hängt an `/home/agent/.claude/skills` seinen **eigenen**
+Skill-Store ein — denselben für alle Sandboxes der Maschine. Ein Symlink dorthin
+schlägt nicht fehl, sondern landet still *im* Store und wäre damit in jeder
+anderen Sandbox sichtbar. Deshalb überspringt der Wrapper `skills` bewusst
+(Details in [architektur.md](architektur.md#der-sonderfall-skills)).
+
+Deine globalen Skills sind trotzdem **lesbar**, nur eben unter dem Host-Pfad:
+
+```bash
+sbx exec devbox-privat bash -c 'ls /Users/DEINNAME/.claude/skills'
+```
+
+Brauchst du einen davon, kopiere ihn nach `.claude/skills/` des Projekts — dort
+wird er zuverlässig gefunden und ist nebenbei versioniert.
+
+Wer den geteilten Store bewusst nutzen will:
+
+```bash
+sbx skills import
+```
+
+⚠️ Das wirkt auf **alle** Sandboxes des Rechners, nicht nur auf devbox.
+
+---
+
 ## Plugins werden nicht geladen, obwohl der Ordner da ist
 
-Bekannte Einschränkung. Claude Code merkt sich in einer separaten Datei, welche
-Plugins aktiviert sind — und die mounten wir bewusst nicht mit, weil daran
-Host-Zustand und Anmeldedaten hängen.
+Der Ordner bringt die Registrierung mit (`installed_plugins.json`), aber nicht
+die *Aktivierung* — die steht in `settings.json`, die wir bewusst nicht mounten.
 
-**Fallback:** Kopiere die Plugin-Skills, die du wirklich überall brauchst, nach
-`~/.claude/skills`. Die werden zuverlässig gefunden.
+Aktiviere das Plugin projektlokal:
+
+```json
+// <projekt>/.claude/settings.json
+{
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true
+  }
+}
+```
 
 ---
 
@@ -196,7 +242,8 @@ Sandbox.
 
 ## Der Build dauert ewig / die Platte läuft voll
 
-Das Image ist rund 6 GB, die tar-Datei beim Übertragen nochmal so viel.
+Das Image belegt rund 5,9 GB, die tar-Datei beim Übertragen etwa 1,4 GB
+(`docker save` komprimiert).
 
 - `./devbox.sh build` überspringt den Vorgang, solange sich das Dockerfile nicht
   geändert hat.

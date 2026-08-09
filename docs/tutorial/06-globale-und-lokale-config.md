@@ -61,7 +61,7 @@ Die Brücke ist ein Symlink:
 ```bash
 sbx exec -d devbox-privat bash -c '
   mkdir -p "$HOME/.claude"
-  for d in agents skills commands rules plugins; do
+  for d in agents commands rules plugins; do
     ln -sfn "/Users/du/.claude/$d" "$HOME/.claude/$d"
   done
 '
@@ -76,7 +76,55 @@ Prüfen:
 sbx exec -it devbox-privat bash -c 'ls -la ~/.claude'
 ```
 
-Du solltest Symlinks sehen, die auf die gemounteten Pfade zeigen.
+Du solltest vier Symlinks sehen, die auf die gemounteten Pfade zeigen.
+
+## ⚠️ Warum `skills` in der Schleife fehlt
+
+Das ist kein Vertipper. Schau dir an, was `sbx create` beim Anlegen ausgibt:
+
+```
+skills  .../com.docker.sandboxes/sandboxes/agent-skills → /home/agent/.claude/skills
+```
+
+**`sbx` hängt an genau diesem Pfad seinen eigenen Skill-Store ein** — und zwar
+denselben Store für *alle* Sandboxes auf der Maschine.
+
+Das Tückische daran ist nicht, dass ein `ln -sfn` dorthin scheitert. Es scheitert
+nämlich **nicht**. Es meldet Erfolg — und legt den Link *in* das eingehängte
+Verzeichnis:
+
+```
+$ ln -sfn /Users/du/.claude/skills ~/.claude/skills
+$ ls -la ~/.claude/skills/
+lrwxrwxrwx  skills -> /Users/du/.claude/skills     # gelandet IM Store
+```
+
+Und weil dieser Store geteilt ist, läge dieser Eintrag damit auch in jeder
+anderen Sandbox deines Rechners. Ein stiller Seiteneffekt über Sandbox-Grenzen
+hinweg — genau das, was eine Sandbox verhindern soll.
+
+Deshalb hat der Wrapper zwei getrennte Listen:
+
+```bash
+CLAUDE_SHARED=(agents skills commands rules plugins)   # wird gemountet
+CLAUDE_LINKED=(agents commands rules plugins)          # wird verlinkt
+```
+
+und zusätzlich eine Sicherung, die abbricht, wenn das Ziel schon ein echtes
+Verzeichnis ist:
+
+```bash
+if [ -d "$ziel" ] && [ ! -L "$ziel" ]; then
+  echo "Hinweis: $ziel ist ein echtes Verzeichnis — uebersprungen." >&2
+  continue
+fi
+```
+
+**Was heißt das praktisch?** Deine globalen `skills` sind in der Sandbox
+weiterhin **lesbar** — unter ihrem Host-Pfad `/Users/du/.claude/skills`. Sie
+werden nur nicht automatisch als User-Skills gefunden. Wenn du einen davon
+brauchst, kopiere ihn in `.claude/skills/` des Projekts. Das ist ohnehin der
+sauberere Weg: dann ist er versioniert und alle im Team haben ihn.
 
 ## Wenn ein Ordner noch nicht existiert
 
@@ -110,11 +158,24 @@ Klingt einfacher. Drei Gründe, warum wir trotzdem mounten:
 | Umfang | nur `skills` | skills, agents, commands, rules, plugins |
 | Stabilität | als **EXPERIMENTAL** markiert | stabile Flags |
 
-Besonders die zweite Zeile: Ein read-write gemounteter, von allen Sandboxes
-geteilter Store bedeutet, dass eine Sandbox die Skills aller anderen verändern
-kann.
+Besonders die zweite Zeile — und die ist nachgemessen, nicht vermutet:
 
-Probier es ruhig aus — aber wisse, was du tust.
+```bash
+# in der Sandbox
+touch ~/.claude/skills/probe     # funktioniert
+```
+
+Der Store ist beschreibbar **und geteilt**. Was du dort ablegst, sehen alle
+anderen Sandboxes auf deinem Rechner — auch die, die zu ganz anderen Projekten
+gehören.
+
+Wenn du das trotzdem willst (es ist ja durchaus bequem):
+
+```bash
+sbx skills import
+```
+
+Aber triff die Entscheidung bewusst, nicht aus Versehen.
 
 ## Projektlokale Konfiguration
 
@@ -189,12 +250,32 @@ sbx exec -it devbox-privat bash -c 'ls -la ~/.claude'   # Symlinks vorhanden
 Und in einer Claude-Session in der Sandbox: Tauchen deine globalen Skills und
 Agents auf? Wenn ja, ist das Kapitel geschafft.
 
-> 📌 **Bekannte Einschränkung bei `plugins`:** Claude Code merkt sich in einer
-> separaten Datei, welche Plugins aktiviert sind — und die mounten wir bewusst
-> nicht mit. Es kann daher sein, dass die Plugin-Ordner zwar in der Sandbox
-> liegen, aber nicht geladen werden. **Fallback:** Kopiere die zwei, drei
-> Plugin-Skills, die du wirklich überall brauchst, nach `~/.claude/skills` —
-> die werden zuverlässig gefunden.
+### Zu `plugins`
+
+Gute Nachricht: Der gemountete Ordner enthält bereits alles Nötige —
+
+```bash
+$ sbx exec devbox-privat bash -c 'ls ~/.claude/plugins/'
+cache  data  installed_plugins.json  known_marketplaces.json  marketplaces
+```
+
+Die Registrierung (`installed_plugins.json`) kommt also mit.
+
+Was **nicht** mitkommt, ist die *Aktivierung*: welche Plugins eingeschaltet sind,
+steht in `settings.json` — und die mounten wir bewusst nicht (siehe oben). Willst
+du ein gemountetes Plugin in der Sandbox nutzen, aktiviere es projektlokal:
+
+```json
+// <projekt>/.claude/settings.json
+{
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true
+  }
+}
+```
+
+Das passt zur Faustregel von eben: global liegt der Inhalt, lokal entscheidet
+das Projekt, was davon gilt.
 
 ---
 

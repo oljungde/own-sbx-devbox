@@ -71,9 +71,36 @@ Deshalb: read-only mounten, eine Quelle.
 | Umfang | nur `skills` | skills, agents, commands, rules, plugins |
 | Stabilität | EXPERIMENTAL | stabile Flags |
 
-Die zweite Zeile ist die wichtigste: Ein read-write gemounteter, von allen
-Sandboxes geteilter Store ist ein Weg, auf dem eine Sandbox die Konfiguration
-aller anderen verändern kann. Das widerspricht dem Zweck einer Sandbox.
+Die zweite Zeile ist die wichtigste — und beim Bauen dieses Repos nachgemessen:
+Der Store ist beschreibbar und wird von **allen** Sandboxes der Maschine geteilt.
+Eine Sandbox kann darüber die Konfiguration aller anderen verändern. Das
+widerspricht dem Zweck einer Sandbox.
+
+### Der Sonderfall `skills`
+
+`sbx` hängt seinen Store an **genau den Pfad**, an den auch unser Symlink
+gehört: `/home/agent/.claude/skills`. Sichtbar schon beim Anlegen:
+
+```
+skills  .../com.docker.sandboxes/sandboxes/agent-skills → /home/agent/.claude/skills
+```
+
+Ein `ln -sfn` dorthin **schlägt nicht fehl** — es meldet Erfolg und legt den Link
+*in* das eingehängte Verzeichnis. Damit läge unsere Konfiguration in jeder
+anderen Sandbox des Rechners. Ein stiller Seiteneffekt über Sandbox-Grenzen
+hinweg, der ohne einen praktischen Test unentdeckt geblieben wäre.
+
+Konsequenz im Wrapper: zwei getrennte Listen (`CLAUDE_SHARED` zum Mounten,
+`CLAUDE_LINKED` zum Verlinken, ohne `skills`) plus eine Sicherung, die jedes Ziel
+überspringt, das bereits ein echtes Verzeichnis ist.
+
+Der Preis: Globale Skills sind in der Sandbox unter ihrem Host-Pfad **lesbar**,
+werden aber nicht automatisch als User-Skills gefunden. Wer einen davon braucht,
+legt ihn projektlokal unter `.claude/skills/` ab — womit er nebenbei versioniert
+und im Team geteilt ist.
+
+Ein `--no-share-skills`-Flag erwähnt zwar `sbx skills --help`, es existiert in
+v0.38.0 aber weder bei `sbx create` noch bei `sbx run`.
 
 **Warum `:ro` und nicht `~/.claude` komplett?**
 

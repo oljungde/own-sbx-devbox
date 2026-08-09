@@ -46,6 +46,19 @@ CONFIG_FILE="${DEVBOX_CONFIG:-$HOME/.config/devbox/devbox.conf}"
 #   projects/, todos/— reiner Host-Zustand
 CLAUDE_SHARED=(agents skills commands rules plugins)
 
+# Und diese davon werden zusätzlich nach /home/agent/.claude/<name> verlinkt,
+# damit Claude sie dort findet.
+#
+# ⚠️  `skills` fehlt hier ABSICHTLICH. sbx hängt an /home/agent/.claude/skills
+#     seinen EIGENEN Skill-Store ein — und zwar denselben für alle Sandboxes
+#     auf dieser Maschine. Ein `ln -sfn` dorthin scheitert nicht etwa, sondern
+#     legt den Link STILL IN diesen Store hinein. Damit läge unsere
+#     Konfiguration plötzlich auch in jeder anderen Sandbox des Rechners.
+#     Nachgemessen beim Bauen dieses Repos — siehe docs/architektur.md.
+#     Der Ordner wird oben trotzdem gemountet, ist also unter seinem
+#     Host-Pfad in der Sandbox lesbar.
+CLAUDE_LINKED=(agents commands rules plugins)
+
 # Netzwerk: bewusst kurz gehalten. Die Sandbox darf standardmäßig NUR das hier.
 # Fehlt dir ein Host, ist das kein Fehler, sondern der Normalfall — füge ihn mit
 # `./devbox.sh allow <host>` hinzu. Genau diese Übung steht in Kapitel 4.
@@ -145,7 +158,10 @@ cmd_up() {
   local shared_mounts=()
   for d in "${CLAUDE_SHARED[@]}"; do
     mkdir -p "$HOME/.claude/$d"
-    shared_mounts+=("$HOME/.claude/$d:ro")
+    # Klammern um $d sind hier kein Zierrat: in zsh würde "$HOME/.claude/$d:ro"
+    # als History-Modifier ":r" gelesen und ergäbe "…/agentso" statt
+    # "…/agents:ro". Mit ${d} ist es in jeder Shell eindeutig.
+    shared_mounts+=("$HOME/.claude/${d}:ro")
   done
 
   if ! sandbox_exists; then
@@ -192,16 +208,27 @@ apply_network() {
 # Warum überhaupt Symlinks? Extra-Workspaces landen in der Sandbox unter ihrem
 # absoluten HOST-Pfad — also z.B. /Users/du/.claude/skills. Claude sucht seine
 # Skills aber in /home/agent/.claude/skills. Der Symlink verbindet beides.
+#
+# Die Prüfung auf "ist das Ziel schon ein echtes Verzeichnis?" ist die
+# Sicherung gegen den oben beschriebenen Fall: Zeigt der Zielpfad auf ein
+# eingehängtes Verzeichnis, würde `ln -sfn` den Link hineinlegen statt es zu
+# ersetzen — und zwar ohne Fehlermeldung. Dann lieber gar nichts tun und es
+# sagen.
 link_shared_config() {
-  info "verlinke globale Agents/Skills/Commands ..."
-  local dirs="${CLAUDE_SHARED[*]}"
+  info "verlinke globale Agents/Commands/Rules/Plugins ..."
+  local dirs="${CLAUDE_LINKED[*]}"
   sbx exec -d "$SANDBOX" bash -c "
     set -u
     mkdir -p \"\$HOME/.claude\"
     for d in $dirs; do
-      if [ -d '$HOME/.claude/'\$d ]; then
-        ln -sfn '$HOME/.claude/'\$d \"\$HOME/.claude/\$d\"
+      quelle='$HOME/.claude/'\$d
+      ziel=\"\$HOME/.claude/\$d\"
+      [ -d \"\$quelle\" ] || continue
+      if [ -d \"\$ziel\" ] && [ ! -L \"\$ziel\" ]; then
+        echo \"Hinweis: \$ziel ist ein echtes Verzeichnis (vermutlich von sbx eingehaengt) — uebersprungen.\" >&2
+        continue
       fi
+      ln -sfn \"\$quelle\" \"\$ziel\"
     done
   "
 }

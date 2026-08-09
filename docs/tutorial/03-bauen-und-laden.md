@@ -48,10 +48,10 @@ sbx template load /tmp/devbox.tar
 rm /tmp/devbox.tar
 ```
 
-> ⚠️ Die tar-Datei ist so groß wie das Image, also ~6 GB. Achte darauf, dass
-> genug Platz da ist, und lösche sie danach. Der Wrapper in Kapitel 7 nimmt dir
-> das ab und überspringt den ganzen Vorgang, solange sich das Dockerfile nicht
-> geändert hat.
+> 💡 Die tar-Datei ist **kleiner als das Image** — bei uns rund 1,4 GB gegenüber
+> 5,9 GB, weil `docker save` die Layer komprimiert schreibt. Trotzdem: danach
+> löschen. Der Wrapper in Kapitel 7 nimmt dir das ab und überspringt den ganzen
+> Vorgang, solange sich das Dockerfile nicht geändert hat.
 
 ## Schritt 3: Sandbox anlegen
 

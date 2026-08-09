@@ -93,7 +93,7 @@ current_hash()  { shasum -a 256 "$DOCKERFILE" | cut -d' ' -f1; }
 
 `build` merkt sich den Fingerabdruck des Dockerfiles. Beim nächsten Aufruf wird
 verglichen — ist er gleich, entfällt der ganze Vorgang. Das spart bei jedem
-Start mehrere Minuten und ~6 GB Schreiblast.
+Start mehrere Minuten und rund 1,4 GB Schreiblast für die Zwischendatei.
 
 ### Netzregeln nur mit `--sandbox`
 
