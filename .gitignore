@@ -1,0 +1,5 @@
+# Lokale, maschinenspezifische Konfiguration (aus devbox.conf.example ableiten)
+devbox.conf
+
+# Temporäre Build-Artefakte
+*.tar

@@ -1,0 +1,55 @@
+# =============================================================================
+# devbox — Profile
+#
+# Kopiere diese Datei nach ~/.config/devbox/devbox.conf und passe die Pfade an:
+#
+#   mkdir -p ~/.config/devbox
+#   cp devbox/devbox.conf.example ~/.config/devbox/devbox.conf
+#
+# Die Datei wird von devbox.sh eingelesen (`source`). Sie ist also ganz normales
+# Bash. Beim Aufruf von `./devbox.sh up <profil>` steht der gewünschte Profilname
+# in $DEVBOX_PROFILE, und dieses Skript muss daraufhin drei Variablen setzen:
+#
+#   NAME         Kurzname der Sandbox. Daraus wird "devbox-<NAME>".
+#   WORKSPACES   Ordner, die die Sandbox sieht. Der ERSTE ist der Startordner.
+#                Ein ":ro" am Ende macht einen Ordner schreibgeschützt.
+#   EXTRA_HOSTS  Zusätzliche Netzwerk-Hosts über die Grundliste hinaus (optional).
+#
+# ⚠️  Merksatz: Workspaces lassen sich NUR beim Anlegen der Sandbox festlegen.
+#     Ein Ordner, der hier fehlt, kann später nicht nachgerüstet werden — dafür
+#     müsstest du die Sandbox entfernen und neu anlegen.
+#     Deshalb: DACH-Ordner mounten, nicht einzelne Projekte. Alles, was du
+#     später unter ~/dev/own anlegst, ist dann automatisch dabei.
+# =============================================================================
+
+case "$DEVBOX_PROFILE" in
+
+  # --- Standardprofil --------------------------------------------------------
+  privat)
+    NAME="privat"
+    WORKSPACES=(
+      "$HOME/dev/own"          # Dach-Ordner: alle privaten Projekte auf einmal
+    )
+    EXTRA_HOSTS=()
+    ;;
+
+  # --- Beispiel: eine getrennte Lern-Sandbox für den Kurs --------------------
+  # Eigene Sandbox = eigener Zustand, eigene Netzregeln, eigener Login.
+  # Beide können gleichzeitig laufen.
+  lernen)
+    NAME="lernen"
+    WORKSPACES=(
+      "$HOME/dev/lernen"
+      "$HOME/dev/own/devbox:ro"   # dieses Repo zum Nachschlagen, schreibgeschützt
+    )
+    EXTRA_HOSTS=(
+      '*.google.com'              # z.B. wenn im Kurs Google-APIs vorkommen
+    )
+    ;;
+
+  *)
+    echo "Unbekanntes Profil: '$DEVBOX_PROFILE'" >&2
+    echo "Bekannte Profile in dieser Datei: privat, lernen" >&2
+    exit 1
+    ;;
+esac
