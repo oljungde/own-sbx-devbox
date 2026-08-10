@@ -545,6 +545,54 @@ sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/
 Erwartet. `~/.claude/plugins` ist **read-only** eingehängt. Plugins installierst
 du auf dem Host; danach holt `solobox sync` sie in die laufende Sandbox.
 
+## `syntax error near unexpected token '<'`
+
+```text
+oliverjung@Mac solobox % sh solobox.sh install
+solobox.sh: line 488: syntax error near unexpected token `<'
+```
+
+Nicht das Skript ist kaputt, sondern die Shell davor. `sh solobox.sh` **ignoriert
+die Shebang-Zeile**, und `/bin/sh` ist auf macOS eine Bash 3.2 im POSIX-Modus —
+die kennt keine Prozess-Substitution (`done < <(…)`). Der Fehler zeigt deshalb
+auf eine Zeile weit hinten im Skript, obwohl der Startbefehl das Problem ist.
+
+Richtig ist:
+
+```bash
+./solobox.sh install       # nutzt die Shebang-Zeile
+bash solobox.sh install    # oder bash ausdrücklich
+```
+
+Seit dieser Fassung startet sich `solobox.sh` in dem Fall selbst unter bash neu
+und sagt es dazu — `sh solobox.sh` funktioniert also auch. Die Erkennung ist
+zweistufig, weil `BASH_VERSION` unter `sh` **gesetzt** ist (es *ist* bash); der
+POSIX-Modus verrät sich nur über `shopt -qo posix`.
+
+Fehlt bash ganz, bricht das Skript mit einem klaren Satz ab.
+
+## `shasum: /Users/du/.local/bin/Dockerfile: No such file or directory`
+
+```text
+oliverjung@Mac projekt % solobox up
+shasum: /Users/oliverjung/.local/bin/Dockerfile: No such file or directory
+```
+
+Das Skript sucht sein Dockerfile im Ordner, in dem es zu liegen glaubt — und
+über den Symlink in `~/.local/bin` war das der falsche. Behoben: `solobox.sh`
+löst Symlinks jetzt auf, bevor es sein Verzeichnis bestimmt, und meldet ein
+fehlendes Dockerfile mit einem verständlichen Satz statt mit einer
+`shasum`-Fehlermeldung.
+
+Tritt es weiterhin auf, zeigt der Symlink ins Leere — typisch, wenn das Repo
+verschoben wurde:
+
+```bash
+ls -l ~/.local/bin/solobox        # wohin zeigt er?
+cd <pfad-zum-repo> && ./solobox/solobox.sh install
+solobox doctor
+```
+
 ## `solobox check` sagt, die Sandbox müsse neu angelegt werden
 
 Zwei Ursachen führen zu Stufe 3, und `check` nennt immer die konkrete:

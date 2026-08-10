@@ -44,19 +44,19 @@ solobox check --base   # zusätzlich: hat sich das Basis-Image bewegt? (Netz)
 solobox check || echo "Stufe $?"
 ```
 
-| Ebene | Frage | Maßnahme |
-|---|---|---|
-| 1 | Image auf dem Stand des Dockerfiles? | `solobox build` |
-| 2 | Image auch im sbx-Store? | `solobox build` |
-| 3 | Sandbox auf diesem Image? | `solobox rm && solobox up` |
-| 4 | Mounts passen zu `ROOTS`/`CLAUDE_SHARED`? | `solobox rm && solobox up` |
+| Ebene | Frage                                      | Maßnahme                    |
+| ----- | ------------------------------------------ | --------------------------- |
+| 1     | Image auf dem Stand des Dockerfiles?       | `solobox build`             |
+| 2     | Image auch im sbx-Store?                   | `solobox build`             |
+| 3     | Sandbox auf diesem Image?                  | `solobox rm && solobox up`  |
+| 4     | Mounts passen zu `ROOTS`/`CLAUDE_SHARED`?  | `solobox rm && solobox up`  |
 
-| Exitcode | Bedeutung |
-|---|---|
-| 0 | alles aktuell |
-| 1 | `solobox sync` genügt |
-| 2 | `solobox build` nötig |
-| 3 | `solobox rm && solobox up` nötig |
+| Exitcode | Bedeutung                        |
+| -------- | -------------------------------- |
+| 0        | alles aktuell                    |
+| 1        | `solobox sync` genügt            |
+| 2        | `solobox build` nötig            |
+| 3        | `solobox rm && solobox up` nötig |
 
 Von Hand nachsehen, woraus etwas entstanden ist:
 

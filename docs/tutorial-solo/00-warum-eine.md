@@ -93,7 +93,7 @@ Alltag. Prüf zuerst, dass der Schutz überhaupt greift:
 sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/null && npm install safe-chain-test'
 ```
 
-```
+```text
 ✖ Safe-chain: Malicious changes detected:
  - safe-chain-test@0.0.1-security
 Safe-chain: Exiting without installing malicious packages.

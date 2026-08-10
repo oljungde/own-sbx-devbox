@@ -59,6 +59,13 @@ prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
   bricht den Drift-Check.
 - **Der Stempelblock bleibt am Ende des Dockerfiles.** Weiter oben entwertet ein
   neuer Stempelwert den Build-Cache aller darüberliegenden Schichten.
+- **Die Shell-Prüfung bleibt die erste ausführbare Zeile.** `sh solobox.sh`
+  ignoriert die Shebang, und `/bin/sh` ist auf macOS bash im POSIX-Modus ohne
+  Prozess-Substitution. Erkennung zweistufig: leeres `BASH_VERSION` **oder**
+  `shopt -qo posix` — unter `sh` ist `BASH_VERSION` nämlich gesetzt.
+- **`SCRIPT_PATH` muss Symlinks auflösen.** `solobox` wird über einen Symlink in
+  `~/.local/bin` aufgerufen; ohne `aufloesen()` sucht das Skript sein Dockerfile
+  dort und scheitert mit `shasum: …/.local/bin/Dockerfile: No such file`.
 - **`pruefe_stand` nie in eine Pipe oder `$(…)` stecken.** Subshell heißt: die
   gesetzte Stufe geht verloren, der Exitcode ist dann immer 0. Die Einrückung ist
   deshalb ein Parameter.

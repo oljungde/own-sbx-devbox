@@ -1,4 +1,35 @@
 #!/usr/bin/env bash
+
+# ⚠️  Läuft dieses Skript wirklich unter bash? `sh solobox.sh` ignoriert die
+#     Shebang-Zeile oben, und /bin/sh ist auf macOS eine Bash 3.2 im
+#     POSIX-Modus. Die kennt keine Prozess-Substitution und bricht mitten im
+#     Skript ab — mit einer Meldung, die nach einem Tippfehler in einer Zeile
+#     weit hinten aussieht statt nach einem falschen Startbefehl:
+#
+#       solobox.sh: line 488: syntax error near unexpected token `<'
+#
+#     Zwei Fälle sind zu unterscheiden, und der zweite ist der gemeine:
+#       1. eine andere Shell (zsh, dash) -> BASH_VERSION ist leer
+#       2. bash IM POSIX-MODUS, weil als `sh` aufgerufen -> BASH_VERSION ist
+#          gesetzt! Erkennbar nur an `shopt -qo posix` (nachgemessen: unter
+#          `sh` an, unter bash aus).
+#
+#     Statt zu meckern starten wir uns selbst unter bash neu — dann funktioniert
+#     auch `sh solobox.sh`. Der Hinweis geht nach stderr, damit man es lernt.
+#     Diese Prüfung steht ganz vorne und ist bewusst in POSIX-Syntax gehalten:
+#     bash liest Skripte stückweise, sie greift also, bevor die erste
+#     unverdauliche Zeile erreicht wird. `shopt` wird nur ausgewertet, wenn
+#     BASH_VERSION gesetzt ist — in zsh gäbe es das Kommando nicht.
+if [ -z "${BASH_VERSION:-}" ] || shopt -qo posix 2>/dev/null; then
+  if command -v bash >/dev/null 2>&1; then
+    echo "Hinweis: solobox.sh braucht bash — ich starte mich neu." >&2
+    echo "Hinweis: kürzer wäre './solobox.sh' oder 'bash solobox.sh'." >&2
+    exec bash "$0" "$@"
+  fi
+  echo "FEHLER: solobox.sh braucht bash, und bash ist nicht installiert." >&2
+  exit 1
+fi
+
 set -euo pipefail
 
 # =============================================================================
@@ -35,9 +66,45 @@ IMAGE="solobox/base:latest"
 BASE_IMAGE="docker/sandbox-templates:claude-code-docker"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/solobox"
 
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+# ⚠️  Symlinks auflösen, BEVOR aus dem Skriptpfad das Verzeichnis wird.
+#     `solobox` wird über einen Symlink in ~/.local/bin aufgerufen (siehe
+#     `install`). Ohne Auflösung zeigt ${BASH_SOURCE[0]} genau dorthin, und das
+#     Skript sucht sein Dockerfile in ~/.local/bin:
+#
+#       shasum: /Users/du/.local/bin/Dockerfile: No such file or directory
+#
+#     Nachgemessen: Der Fehler blieb lange verborgen, weil der alte Ablauf
+#     `current_hash` nur in einem Zweig aufrief. Seit `check` es immer tut,
+#     schlägt er bei jedem Aufruf über den Symlink zu.
+#
+#     `readlink -f` gibt es auf macOS nicht verlässlich (BSD-readlink kennt das
+#     Flag erst in neueren Versionen), deshalb die Schleife. Sie folgt auch einer
+#     Kette von Symlinks und behandelt relative Ziele.
+aufloesen() {
+  local pfad="$1" ziel
+  while [ -L "$pfad" ]; do
+    ziel="$(readlink "$pfad")"
+    case "$ziel" in
+      /*) pfad="$ziel" ;;
+      *)  pfad="$(dirname "$pfad")/$ziel" ;;
+    esac
+  done
+  printf '%s\n' "$pfad"
+}
+
+SCRIPT_PATH="$(aufloesen "${BASH_SOURCE[0]}")"
+SCRIPT_PATH="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)/$(basename "$SCRIPT_PATH")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 DOCKERFILE="$SCRIPT_DIR/Dockerfile"
+
+# Sofort prüfen statt später mit einer shasum-Fehlermeldung zu scheitern: Ohne
+# das Dockerfile daneben kann dieses Skript nichts bauen und nichts vergleichen.
+if [ ! -f "$DOCKERFILE" ]; then
+  printf 'FEHLER: Dockerfile nicht gefunden: %s\n' "$DOCKERFILE" >&2
+  printf 'FEHLER: solobox.sh erwartet es im selben Ordner. Wurde das Repo verschoben?\n' >&2
+  printf 'FEHLER: Dann den Symlink neu setzen: <repo>/solobox/solobox.sh install\n' >&2
+  exit 1
+fi
 
 # Wohin `install` den Symlink legt. ~/.local/bin liegt auf den meisten Systemen
 # schon auf dem PATH.
@@ -286,6 +353,22 @@ local_image_id() {
 basis_digest() {
   docker buildx imagetools inspect "$BASE_IMAGE" \
     --format '{{.Manifest.Digest}}' 2>/dev/null || true
+}
+
+# Antwortet der Docker-Daemon? "Kein Image" und "ich kann nicht nachsehen" sind
+# zwei verschiedene Aussagen, und nur die erste rechtfertigt ein 'build'.
+# `.Server.Version` fragt bewusst den DAEMON ab — die Client-Version antwortet
+# auch dann, wenn Docker Desktop gar nicht läuft.
+docker_erreichbar() {
+  docker version --format '{{.Server.Version}}' >/dev/null 2>&1
+}
+
+# Dasselbe für sbx. Eine leere Liste heißt "keine Sandbox", ein FEHLER heißt
+# "ich weiß es nicht" (typisch: nicht bei Docker angemeldet). Ohne diese
+# Unterscheidung würde ein fehlendes `sbx login` als "keine Sandbox vorhanden"
+# durchgehen — und `up` wollte daraufhin eine zweite anlegen.
+sbx_erreichbar() {
+  sbx ls -q >/dev/null 2>&1
 }
 
 sandbox_running() {
@@ -805,12 +888,18 @@ pruefe_stand() {
 
   local dockerfile_hash stempel_image image_id template
   dockerfile_hash="$(current_hash)"
+
+  local docker_antwortet=1
+  docker_erreichbar || docker_antwortet=0
+
   stempel_image="$(image_stamp)"
   image_id="$(local_image_id)"
   template="$(template_id)"
 
   zeile "--- 1. Lokales Image gegen Dockerfile ---"
-  if [ -z "$image_id" ]; then
+  if [ "$docker_antwortet" -eq 0 ]; then
+    melde 0 "·" "Docker antwortet nicht — übersprungen (läuft Docker Desktop?)"
+  elif [ -z "$image_id" ]; then
     melde 2 "✗" "kein lokales Image '$IMAGE' — 'solobox build'"
   elif [ -z "$stempel_image" ] || [ "$stempel_image" = "unbekannt" ]; then
     melde 2 "·" "Image trägt keinen Stempel (vor dieser solobox-Version gebaut)"
@@ -825,21 +914,19 @@ pruefe_stand() {
   if [ -z "$template" ]; then
     melde 2 "✗" "kein Template '$IMAGE' im Store — 'solobox build'"
     zeile "      (Oder du bist nicht angemeldet: 'sbx login'. Beides sieht gleich aus.)"
-  elif [ -n "$image_id" ] && [ "$template" != "$image_id" ]; then
+  elif [ -z "$image_id" ]; then
+    # Template ist da, aber der lokale Bau lässt sich nicht abfragen — dann ist
+    # "entspricht dem lokalen Image" eine Behauptung, nicht ein Befund.
+    melde 0 "·" "Template vorhanden ($template); lokales Image nicht abfragbar"
+  elif [ "$template" != "$image_id" ]; then
     melde 2 "✗" "Store hat ein anderes Image ($template) als der lokale Bau ($image_id)"
     zeile "      Das lokale Image wurde gebaut, aber nicht geladen — 'solobox build'."
   else
     melde 0 "✓" "Template im Store entspricht dem lokalen Image"
   fi
 
-  # Bevor über die Sandbox geurteilt wird: antwortet sbx überhaupt? Eine leere
-  # Liste heißt "keine Sandbox", ein FEHLER heißt "ich weiß es nicht" — und das
-  # ist etwas völlig anderes. Ohne diese Unterscheidung würde ein fehlendes
-  # `sbx login` als "keine Sandbox vorhanden" durchgehen (dieselbe Falle wie bei
-  # template_id, nur mit schlimmerer Folge: 'up' würde eine zweite anlegen
-  # wollen).
   local sbx_antwortet=1
-  sbx ls -q >/dev/null 2>&1 || sbx_antwortet=0
+  sbx_erreichbar || sbx_antwortet=0
 
   zeile "--- 3. Sandbox gegen Template ---"
   if [ "$sbx_antwortet" -eq 0 ]; then
