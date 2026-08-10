@@ -16,12 +16,12 @@ ls ~/.claude
 
 Grob drei Gruppen:
 
-| Gruppe | Beispiele | gehört in die Sandbox? |
-|---|---|---|
-| Deine Arbeit | `agents/`, `skills/`, `commands/`, `rules/`, `plugins/`, `hooks/` | **ja**, read-only |
-| Deine Geheimnisse | `.credentials.json` | **nie** |
-| Host-Zustand | `projects/`, `history.jsonl`, `sessions/`, `file-history/`, `ide/`, `.claude.json` | nein |
-| Host-Einstellungen | `settings.json` | nicht mounten — ableiten (Kapitel 3) |
+| Gruppe             | Beispiele                                                                          | gehört in die Sandbox?               |
+| ------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ |
+| Deine Arbeit       | `agents/`, `skills/`, `commands/`, `rules/`, `plugins/`, `hooks/`                  | **ja**, read-only                    |
+| Deine Geheimnisse  | `.credentials.json`                                                                | **nie**                              |
+| Host-Zustand       | `projects/`, `history.jsonl`, `sessions/`, `file-history/`, `ide/`, `.claude.json` | nein                                 |
+| Host-Einstellungen | `settings.json`                                                                    | nicht mounten — ableiten (Kapitel 3) |
 
 Die letzte Zeile ist die interessanteste: `settings.json` enthält Berechtigungen
 und Pfade **deines Hosts**, teils einen kompletten `sandbox`-Block. Die gelten
@@ -50,9 +50,11 @@ sbx create -t solobox/base:latest --name solobox claude \
 > Eingabe. `sbx` verweigert das Anlegen, wenn ein Mount-Ziel nicht existiert. Auf
 > frisch eingerichteten Rechnern fehlen z.B. `commands/` oder `rules/`. Anlegen
 > und noch einmal:
+>
 > ```bash
 > mkdir -p ~/.claude/{agents,skills,commands,rules,plugins,hooks}
 > ```
+>
 > Der Wrapper in Kapitel 6 macht genau das still im Hintergrund.
 
 ## Warum das allein nichts bringt
@@ -101,7 +103,7 @@ für **alle** Sandboxes dieser Maschine.
 Was passiert, wenn man trotzdem `ln -sfn` darauf loslässt? Kein Fehler. Der Link
 landet **in** diesem Verzeichnis:
 
-```
+```bash
 /home/agent/.claude/skills/skills -> /Users/dein-name/.claude/skills
 ```
 
@@ -169,7 +171,7 @@ cd ~/dev/own/mein-projekt
 sbx exec -it -w "$PWD" solobox claude
 ```
 
-```
+```bash
 /skills
 /agents
 ```
@@ -177,6 +179,7 @@ sbx exec -it -w "$PWD" solobox claude
 Erwartet: dieselben Einträge wie auf deinem Host.
 
 Fehlt etwas, geht die Suche in dieser Reihenfolge:
+
 1. Ist der Ordner überhaupt gemountet? → `sbx ls` zeigt die Workspaces.
 2. Zeigt der Symlink richtig? → `sbx exec solobox ls -l '$HOME/.claude'`
 3. Bei Skills: liegt die Kopie im Store? → `sbx exec solobox ls '$HOME/.claude/skills'`

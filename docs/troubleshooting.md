@@ -330,7 +330,7 @@ Das Image belegt rund 5,9 GB, die tar-Datei beim Übertragen etwa 1,4 GB
 
 ---
 
-# Nur solobox (Variante 2)
+## Nur solobox (Variante 2)
 
 ## `solobox: command not found`
 
@@ -357,7 +357,7 @@ Genau das prüft die CI mit `test -x`, damit es niemandem sonst passiert.
 
 ## `workspace path exists but is not a directory`
 
-```
+```bash
 ERROR: workspace path exists but is not a directory: /Users/du/.gitconfig
 ```
 
@@ -373,7 +373,7 @@ Credential-Helfer-Pfade, die im Container ins Leere zeigen.
 
 ## Commits aus der Sandbox haben keinen Autor
 
-```
+```bash
 Author identity unknown
 ```
 
@@ -392,7 +392,7 @@ Fast immer wurde Claude **nicht im Projektordner gestartet**. Claude Code liest
 `CLAUDE.md`, `.claude/` und `.mcp.json` beim **Start** aus dem
 Arbeitsverzeichnis; ein `cd` in der laufenden Sitzung holt das nicht nach.
 
-```
+```bash
 /status          # zeigt das Arbeitsverzeichnis
 ```
 
@@ -405,7 +405,7 @@ solobox up
 
 ## „liegt unter keiner der Wurzeln"
 
-```
+```bash
 !! '/Users/du/woanders' liegt unter keiner der Wurzeln (/Users/du/dev ...)
 ```
 
@@ -420,7 +420,7 @@ solobox rm && solobox up                   # kostet den Login
 
 ## Nach jeder Antwort erscheint ein Hook-Fehler
 
-```
+```bash
 osascript: command not found
 ```
 
@@ -492,7 +492,7 @@ Fehler.
 Schreibversuche außerhalb des Ordners, in dem Claude gestartet wurde, werden
 hart abgewiesen:
 
-```
+```bash
 Schreibzugriff außerhalb des erlaubten Arbeitsverzeichnisses blockiert
 ```
 

@@ -10,10 +10,10 @@ dem Host, soweit sie dort hingehören.
 
 ## Zwei Herkünfte, zwei Wege
 
-| Herkunft | Beispiel | Weg in die Sandbox |
-|---|---|---|
-| Ein **Plugin** bringt ihn mit | grepika, Atlassian, Figma, Playwright | nichts zu tun — kommt mit `enabledPlugins` |
-| Eigenständig registriert | Linear, Notion, ein eigener stdio-Server | `sbx mcp add` + `sbx mcp load` |
+| Herkunft                      | Beispiel                                 | Weg in die Sandbox                         |
+| ----------------------------- | ---------------------------------------- | ------------------------------------------ |
+| Ein **Plugin** bringt ihn mit | grepika, Atlassian, Figma, Playwright    | nichts zu tun — kommt mit `enabledPlugins` |
+| Eigenständig registriert      | Linear, Notion, ein eigener stdio-Server | `sbx mcp add` + `sbx mcp load`             |
 
 Was **nicht** funktioniert: die `~/.claude.json` des Hosts einhängen. Dort stehen
 MCP-Einträge und Sitzungszustand in derselben Datei — und der Zustand hat in
@@ -28,7 +28,7 @@ cd ~/dev/own/mein-projekt
 sbx exec -it -w "$PWD" solobox claude
 ```
 
-```
+```bash
 /mcp
 ```
 
@@ -94,7 +94,7 @@ angemeldet bist. Freigeschaltet sein muss trotzdem der Host, über den sie reden
 
 ## Prüfen
 
-```
+```bash
 /mcp
 ```
 
@@ -103,11 +103,11 @@ hast.
 
 Kurzdiagnose, wenn etwas fehlt:
 
-| Symptom | Ursache | Prüfen mit |
-|---|---|---|
-| Server fehlt ganz | Plugin nicht aktiv, oder nicht geladen | `/plugin`, `sbx mcp ls` |
-| Server da, Werkzeuge scheitern | Host nicht freigegeben | `sbx policy ls solobox` |
-| Server verlangt Anmeldung | OAuth auf dem Host fehlt | `sbx mcp auth <name>` |
+| Symptom                        | Ursache                                | Prüfen mit              |
+| ------------------------------ | -------------------------------------- | ----------------------- |
+| Server fehlt ganz              | Plugin nicht aktiv, oder nicht geladen | `/plugin`, `sbx mcp ls` |
+| Server da, Werkzeuge scheitern | Host nicht freigegeben                 | `sbx policy ls solobox` |
+| Server verlangt Anmeldung      | OAuth auf dem Host fehlt               | `sbx mcp auth <name>`   |
 
 ---
 

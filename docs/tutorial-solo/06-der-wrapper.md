@@ -10,16 +10,16 @@ welche Zeile welchen Handgriff ersetzt.
 
 ## Was der Wrapper ersetzt
 
-| Kapitel | Handgriff | im Wrapper |
-|---|---|---|
-| 0 | `docker build`, `docker save`, `sbx template load` | `cmd_build` |
-| 1 | `sbx create` mit allen Wurzeln | `provision` |
-| 1 | `sbx exec -it -w "$PWD" … claude` | `cmd_up` |
-| 2 | Symlinks für agents/commands/rules/plugins/hooks | `link_shared_config` |
-| 2 | `tar`-Kopie der Skills | `copy_skills` |
-| 3 | abgeleitete `settings.json` | `apply_settings` |
-| 4 | `sbx mcp load` je Server | `load_mcp` |
-| 1–4 | Netzregeln setzen | `apply_network` |
+| Kapitel | Handgriff                                          | im Wrapper           |
+| ------- | -------------------------------------------------- | -------------------- |
+| 0       | `docker build`, `docker save`, `sbx template load` | `cmd_build`          |
+| 1       | `sbx create` mit allen Wurzeln                     | `provision`          |
+| 1       | `sbx exec -it -w "$PWD" … claude`                  | `cmd_up`             |
+| 2       | Symlinks für agents/commands/rules/plugins/hooks   | `link_shared_config` |
+| 2       | `tar`-Kopie der Skills                             | `copy_skills`        |
+| 3       | abgeleitete `settings.json`                        | `apply_settings`     |
+| 4       | `sbx mcp load` je Server                           | `load_mcp`           |
+| 1–4     | Netzregeln setzen                                  | `apply_network`      |
 
 Mehr nicht. Jede Zeile darin kannst du auch von Hand tippen — genau das hast du
 in den letzten fünf Kapiteln getan.
@@ -118,14 +118,14 @@ cp solobox/solobox.conf.example ~/.config/solobox/solobox.conf
 
 Fünf Variablen, alle optional:
 
-| Variable | Wofür | Standard |
-|---|---|---|
-| `ROOTS` | was die Sandbox sieht (**nur Verzeichnisse**) | `~/dev` |
-| `EXTRA_HOSTS` | zusätzliche Netzziele | leer |
-| `MCP_SERVERS` | per `sbx mcp add` registrierte Server | leer |
-| `HOOK_SKIP` | Hooks, die im Container nicht gelten | `Notification Stop` |
-| `PERMISSION_MODE` | wie viel Claude ohne Rückfrage darf | `acceptEdits` |
-| `ISOLATE_SKILLS` | eigener statt geteilter Skill-Store | `0` |
+| Variable          | Wofür                                         | Standard            |
+| ----------------- | --------------------------------------------- | ------------------- |
+| `ROOTS`           | was die Sandbox sieht (**nur Verzeichnisse**) | `~/dev`             |
+| `EXTRA_HOSTS`     | zusätzliche Netzziele                         | leer                |
+| `MCP_SERVERS`     | per `sbx mcp add` registrierte Server         | leer                |
+| `HOOK_SKIP`       | Hooks, die im Container nicht gelten          | `Notification Stop` |
+| `PERMISSION_MODE` | wie viel Claude ohne Rückfrage darf           | `acceptEdits`       |
+| `ISOLATE_SKILLS`  | eigener statt geteilter Skill-Store           | `0`                 |
 
 ⚠️ `ROOTS` wirkt nur beim **Anlegen**. Eine Änderung daran verlangt
 `solobox rm && solobox up` — und das kostet den Login.
@@ -168,7 +168,7 @@ solobox up
 
 In der Sitzung:
 
-```
+```bash
 /skills     # global + projektlokal
 /agents     # global
 /plugin     # deine Plugins

@@ -1,7 +1,7 @@
 # Kapitel 1 — Nackt starten
 
 **Ziel:** Eine Sandbox starten, in der Claude läuft — ganz ohne Vorbereitung.
-Und dabei erleben, was alles *fehlt*. Genau diese Lücken füllen wir in den
+Und dabei erleben, was alles _fehlt_. Genau diese Lücken füllen wir in den
 folgenden Kapiteln.
 
 **Am Ende dieses Kapitels:** Du hast eine laufende Sandbox und verstehst, warum
@@ -12,7 +12,7 @@ sie so wenig kann.
 ## Was ist eine Sandbox überhaupt?
 
 Stell dir Claude als einen Helfer vor, dem du dein Projekt gibst. Ohne Sandbox
-läuft er auf deinem Rechner mit *deinen* Rechten: Er sieht dein ganzes
+läuft er auf deinem Rechner mit _deinen_ Rechten: Er sieht dein ganzes
 Home-Verzeichnis, deine SSH-Schlüssel, deine Zugangsdaten für alles.
 
 Eine Sandbox ist ein abgeschlossener Container. Der Helfer sitzt darin und sieht
@@ -48,7 +48,7 @@ sbx run claude .
 
 Beim allerersten Mal fragt `sbx` nach einer **Netzwerk-Policy**:
 
-```
+```bash
   1. Open         — Aller Netzwerkverkehr erlaubt.
 ❯ 2. Balanced     — Standardmäßig blockiert, gängige Dev-Seiten erlaubt.
   3. Locked Down  — Alles blockiert, außer du erlaubst es ausdrücklich.
@@ -116,12 +116,12 @@ das ist die Netzwerk-Policy aus Schritt 2 bei der Arbeit.
 
 ## Was du jetzt weißt
 
-| Erkenntnis | Bedeutung fürs nächste Kapitel |
-|---|---|
+| Erkenntnis                              | Bedeutung fürs nächste Kapitel    |
+| --------------------------------------- | --------------------------------- |
 | Die Sandbox erbt nichts aus `~/.claude` | Kapitel 6 holt das gezielt zurück |
-| Die Toolchain ist minimal | Kapitel 2 baut ein eigenes Image |
-| Das Netz ist standardmäßig zu | Kapitel 4 öffnet es kontrolliert |
-| Nur ein Ordner ist sichtbar | Kapitel 5 mountet mehrere |
+| Die Toolchain ist minimal               | Kapitel 2 baut ein eigenes Image  |
+| Das Netz ist standardmäßig zu           | Kapitel 4 öffnet es kontrolliert  |
+| Nur ein Ordner ist sichtbar             | Kapitel 5 mountet mehrere         |
 
 ## Aufräumen
 

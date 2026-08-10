@@ -27,9 +27,9 @@ sbx create -t devbox/base:latest --name devbox-privat claude \
 
 Zwei Regeln dazu:
 
-- Der **erste** Pfad ist der Startordner (*Primary Workspace*). Dort landet der
+- Der **erste** Pfad ist der Startordner (_Primary Workspace_). Dort landet der
   Agent beim Start.
-- Alle **weiteren** werden unter ihrem *absoluten Host-Pfad* eingehängt. Ein
+- Alle **weiteren** werden unter ihrem _absoluten Host-Pfad_ eingehängt. Ein
   `~/dev/referenz` auf dem Host ist in der Sandbox unter genau demselben Pfad
   erreichbar.
 
@@ -98,11 +98,11 @@ cat ~/dev/own/brandneu/test.txt     # ist sofort da
 Ein Dach-Ordner heißt nicht, dass alles in **eine** Sandbox muss. Getrennte
 Sandboxes sind sinnvoll, wenn sich Dinge unterscheiden sollen:
 
-| Grund | Beispiel |
-|---|---|
-| Andere Zugangsdaten | privat vs. beruflich |
-| Andere Netzregeln | ein Projekt braucht eine interne API |
-| Anderer Laufzeitzustand | globale npm-Pakete, die sich beißen |
+| Grund                   | Beispiel                             |
+| ----------------------- | ------------------------------------ |
+| Andere Zugangsdaten     | privat vs. beruflich                 |
+| Andere Netzregeln       | ein Projekt braucht eine interne API |
+| Anderer Laufzeitzustand | globale npm-Pakete, die sich beißen  |
 
 ```bash
 sbx create -t devbox/base:latest --name devbox-privat  claude ~/dev/own

@@ -16,13 +16,13 @@ Verdrängt das die Konfiguration einzelner Projekte?
 Die These lautet **nein**, und zwar ohne dass wir dafür etwas bauen müssen.
 Claude Code liest projektlokale Konfiguration aus dem Arbeitsverzeichnis:
 
-| Ort | Was |
-|---|---|
-| `<projekt>/CLAUDE.md` | Anweisungen für dieses Projekt |
-| `<projekt>/.claude/skills/` | Skills, die nur hier gelten |
-| `<projekt>/.claude/agents/` | Agents, die nur hier gelten |
+| Ort                           | Was                                |
+| ----------------------------- | ---------------------------------- |
+| `<projekt>/CLAUDE.md`         | Anweisungen für dieses Projekt     |
+| `<projekt>/.claude/skills/`   | Skills, die nur hier gelten        |
+| `<projekt>/.claude/agents/`   | Agents, die nur hier gelten        |
 | `<projekt>/.claude/commands/` | Slash-Kommandos für dieses Projekt |
-| `<projekt>/.mcp.json` | MCP-Server für dieses Projekt |
+| `<projekt>/.mcp.json`         | MCP-Server für dieses Projekt      |
 
 Und weil dein Projekt aus `~/dev` **echt eingehängt** ist, liegen diese Dateien
 längst in der Sandbox. Es ist nichts zu kopieren, nichts zu verlinken.
@@ -63,13 +63,13 @@ sbx exec -it -w "$PWD" solobox claude
 
 Und drei Dinge prüfen:
 
-```
+```bash
 /skills
 ```
 
 **Erwartet:** die globalen Skills aus Kapitel 2 **und** `projekt-gruss`.
 
-```
+```bash
 /memory
 ```
 
@@ -108,7 +108,7 @@ cd ~/dev
 sbx exec -it -w "$PWD" solobox claude
 ```
 
-```
+```bash
 /skills
 ```
 
@@ -129,9 +129,10 @@ und die Reihenfolge der Prüfung ist:
    `name:` und `description:` im Frontmatter. Ohne `description` wird ein Skill
    nicht angeboten.
 3. **Sieht die Sandbox die Datei?**
-   ```bash
-   sbx exec solobox ls ~/dev/own/solobox-test/.claude/skills
-   ```
+
+    ```bash
+    sbx exec solobox ls ~/dev/own/solobox-test/.claude/skills
+    ```
 
 Bleibt es dabei, ist das der eine Punkt, an dem solobox etwas dazubauen müsste:
 ein Kommando, das projektlokale Skills beim Start in den Store der Sandbox

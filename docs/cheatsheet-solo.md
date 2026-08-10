@@ -38,29 +38,29 @@ solobox status            # was läuft, mit welchen Wurzeln
 
 ## Wenn sich auf dem Host etwas geändert hat
 
-| Geändert | Kommando | Wirkt |
-|---|---|---|
-| Neuer Skill in `~/.claude/skills` | `solobox sync` | nach Neustart der Sitzung |
-| Plugin installiert/aktiviert | `solobox sync` | nach Neustart der Sitzung |
-| Neuer MCP-Server (`sbx mcp add`) | `MCP_SERVERS` ergänzen, `solobox sync` | sofort |
-| Neuer Agent / Command / Rule | nichts — die sind gemountet | sofort |
-| Dockerfile geändert | `solobox update` | erst nach `rm` + `up` |
-| `ROOTS` geändert | `solobox rm && solobox up` | kostet den Login |
+| Geändert                          | Kommando                               | Wirkt                     |
+| --------------------------------- | -------------------------------------- | ------------------------- |
+| Neuer Skill in `~/.claude/skills` | `solobox sync`                         | nach Neustart der Sitzung |
+| Plugin installiert/aktiviert      | `solobox sync`                         | nach Neustart der Sitzung |
+| Neuer MCP-Server (`sbx mcp add`)  | `MCP_SERVERS` ergänzen, `solobox sync` | sofort                    |
+| Neuer Agent / Command / Rule      | nichts — die sind gemountet            | sofort                    |
+| Dockerfile geändert               | `solobox update`                       | erst nach `rm` + `up`     |
+| `ROOTS` geändert                  | `solobox rm && solobox up`             | kostet den Login          |
 
 ## Die Kommandos
 
-| Kommando | Was es tut |
-|---|---|
-| `solobox up [pfad]` | Sandbox anlegen (einmalig) und Claude starten — in `$PWD` oder in `[pfad]` |
-| `solobox build [--force]` | Image bauen, als sbx-Template laden |
-| `solobox sync` | Skills, Settings, MCP in die laufende Sandbox nachziehen |
-| `solobox shell [pfad]` | bash in der Sandbox |
-| `solobox allow <host>` | Host für die Sandbox freigeben (bis zum Neuanlegen) |
-| `solobox status` | Template, Sandbox, Wurzeln, MCP-Server, Nachbarn |
-| `solobox update` | Template neu bauen und sagen, was das der Sandbox *nicht* bringt |
-| `solobox install` | Symlink nach `~/.local/bin/solobox` |
-| `solobox doctor` | Host prüfen |
-| `solobox rm` | Sandbox entfernen (fragt nach) |
+| Kommando                  | Was es tut                                                                 |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `solobox up [pfad]`       | Sandbox anlegen (einmalig) und Claude starten — in `$PWD` oder in `[pfad]` |
+| `solobox build [--force]` | Image bauen, als sbx-Template laden                                        |
+| `solobox sync`            | Skills, Settings, MCP in die laufende Sandbox nachziehen                   |
+| `solobox shell [pfad]`    | bash in der Sandbox                                                        |
+| `solobox allow <host>`    | Host für die Sandbox freigeben (bis zum Neuanlegen)                        |
+| `solobox status`          | Template, Sandbox, Wurzeln, MCP-Server, Nachbarn                           |
+| `solobox update`          | Template neu bauen und sagen, was das der Sandbox _nicht_ bringt           |
+| `solobox install`         | Symlink nach `~/.local/bin/solobox`                                        |
+| `solobox doctor`          | Host prüfen                                                                |
+| `solobox rm`              | Sandbox entfernen (fragt nach)                                             |
 
 ## Die rohen `sbx`-Kommandos dahinter
 
@@ -148,14 +148,14 @@ laufend angeglichen. `solobox rm && solobox up` — und der Login ist weg.
 
 ## Unterschiede zu devbox auf einen Blick
 
-| | devbox | solobox |
-|---|---|---|
-| Aufruf | `./devbox/devbox.sh up privat` | `solobox up` im Projekt |
-| Sandboxes | eine pro Profil | genau eine |
-| Conf | Pflicht | optional |
-| Skills/Agents global | über `SHARE_ALL` | immer |
-| Hooks aus `~/.claude` | nein | ja, gefiltert |
-| Startordner | Primary Workspace | das aktuelle Projekt |
+|                       | devbox                         | solobox                 |
+| --------------------- | ------------------------------ | ----------------------- |
+| Aufruf                | `./devbox/devbox.sh up privat` | `solobox up` im Projekt |
+| Sandboxes             | eine pro Profil                | genau eine              |
+| Conf                  | Pflicht                        | optional                |
+| Skills/Agents global  | über `SHARE_ALL`               | immer                   |
+| Hooks aus `~/.claude` | nein                           | ja, gefiltert           |
+| Startordner           | Primary Workspace              | das aktuelle Projekt    |
 
 ## Wenn etwas klemmt
 

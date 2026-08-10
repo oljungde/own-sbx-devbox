@@ -9,7 +9,7 @@ Werkzeugen, die in Kapitel 1 gefehlt haben.
 
 ## Drei Begriffe, die man leicht verwechselt
 
-```
+```bash
 Dockerfile  --docker build-->  Image  --sbx template load-->  Template
                                                                  |
                                                         sbx create -t
@@ -17,12 +17,12 @@ Dockerfile  --docker build-->  Image  --sbx template load-->  Template
                                                               Sandbox
 ```
 
-| Begriff | Was es ist |
-|---|---|
-| **Dockerfile** | Die Bauanleitung. Eine Textdatei. |
-| **Image** | Das gebaute Ergebnis. Mehrere GB, liegt in deinem Docker. |
-| **Template** | Dasselbe Image, aber im Store von `sbx` registriert. |
-| **Sandbox** | Der laufende Container, erzeugt aus einem Template. |
+| Begriff        | Was es ist                                                |
+| -------------- | --------------------------------------------------------- |
+| **Dockerfile** | Die Bauanleitung. Eine Textdatei.                         |
+| **Image**      | Das gebaute Ergebnis. Mehrere GB, liegt in deinem Docker. |
+| **Template**   | Dasselbe Image, aber im Store von `sbx` registriert.      |
+| **Sandbox**    | Der laufende Container, erzeugt aus einem Template.       |
 
 Das **Template wird einmal pro Rechner gebaut**. Daraus entstehen beliebig viele
 Sandboxes — für dein privates Zeug, für den Kurs, für ein Experiment.
@@ -66,7 +66,7 @@ Drei davon verdienen eine Erklärung:
 `g++`, `make` und die C-Header. Gebraucht wird es, sobald ein Paket **nativen
 Code kompilieren** muss:
 
-```
+```bash
 pip install irgendwas
   → error: command 'gcc' failed: No such file or directory
 ```
@@ -126,7 +126,7 @@ uv run python --version    # Python 3.10.x
 
 ### `chmod a+rX` — warum großes X?
 
-Kleines `x` würde *jede* Datei ausführbar machen, auch Textdateien. Großes `X`
+Kleines `x` würde _jede_ Datei ausführbar machen, auch Textdateien. Großes `X`
 setzt das Ausführrecht **nur bei Verzeichnissen und Dateien, die schon für
 irgendjemanden ausführbar sind**. Genau das will man hier.
 

@@ -1,6 +1,6 @@
 # Architektur — das Warum hinter den Entscheidungen
 
-Das Tutorial erklärt, *wie* devbox gebaut wird. Dieses Dokument erklärt, *warum*
+Das Tutorial erklärt, _wie_ devbox gebaut wird. Dieses Dokument erklärt, _warum_
 es so und nicht anders gebaut ist. Wenn du das Projekt umbauen willst, lies das
 hier zuerst.
 
@@ -8,7 +8,7 @@ hier zuerst.
 
 ## Die drei Ebenen
 
-```
+```bash
 Dockerfile  --docker build-->  Image  --sbx template load-->  Template
                                                                  |
                                                         sbx create -t
@@ -17,7 +17,7 @@ Dockerfile  --docker build-->  Image  --sbx template load-->  Template
 ```
 
 Das **Template ist teuer** (Minuten, Gigabyte), die **Sandbox ist billig**
-(Sekunden). Daraus folgt die Grundform: *ein* Template pro Rechner, *mehrere*
+(Sekunden). Daraus folgt die Grundform: _ein_ Template pro Rechner, _mehrere_
 Sandboxes daraus.
 
 Der Umweg über `docker save` existiert, weil der Docker-Daemon von `sbx` nicht
@@ -30,7 +30,7 @@ derselbe ist wie dein lokaler und dessen Image-Store nicht sieht.
 `sbx` bietet ein deklaratives Kit-Format an. Es liest sich besser als Bash. Wir
 benutzen es trotzdem nicht als Fundament:
 
-```
+```bash
 $ sbx kit --help
 EXPERIMENTAL: this command may change or be removed in future releases.
 ```
@@ -39,12 +39,12 @@ Für Material, das über Monate in einem Kurs benutzt wird, ist das ein
 inakzeptables Risiko. Entscheidend war aber ein zweiter Befund: **Es gibt nichts,
 was ein Kit kann und ein stabiles Kommando nicht.**
 
-| Kit-Feature | Stabile Entsprechung |
-|---|---|
+| Kit-Feature           | Stabile Entsprechung                 |
+| --------------------- | ------------------------------------ |
 | `permissions.network` | `sbx policy allow network --sandbox` |
-| `credentials` | `sbx secret` |
-| Umgebungsvariablen | `/etc/sandbox-persistent.sh` |
-| Startup-Kommandos | `sbx exec -d` |
+| `credentials`         | `sbx secret`                         |
+| Umgebungsvariablen    | `/etc/sandbox-persistent.sh`         |
+| Startup-Kommandos     | `sbx exec -d`                        |
 
 Ein Kit ist also Bequemlichkeit, kein Ermöglicher. Es liegt als
 [`devbox/kit/kit.yaml`](../devbox/kit/kit.yaml) bei, damit man es kennenlernen
@@ -56,7 +56,7 @@ kann — aber nichts hängt davon ab.
 
 ## Mounten statt kopieren
 
-Skills und Agents, die man in *allen* Projekten braucht, in *jedes* Projekt zu
+Skills und Agents, die man in _allen_ Projekten braucht, in _jedes_ Projekt zu
 kopieren, erzeugt so viele Wahrheiten, wie es Projekte gibt. Nach kurzer Zeit
 laufen sie auseinander.
 
@@ -64,12 +64,12 @@ Deshalb: read-only mounten, eine Quelle.
 
 **Warum nicht `sbx skills import`?**
 
-| | `sbx skills import` | `:ro`-Mount |
-|---|---|---|
-| Aktualität | Kopie, Re-Import nötig | live |
-| Schreibrechte | Store ist **read-write** | read-only |
-| Umfang | nur `skills` | skills, agents, commands, rules, plugins |
-| Stabilität | EXPERIMENTAL | stabile Flags |
+|               | `sbx skills import`      | `:ro`-Mount                              |
+| ------------- | ------------------------ | ---------------------------------------- |
+| Aktualität    | Kopie, Re-Import nötig   | live                                     |
+| Schreibrechte | Store ist **read-write** | read-only                                |
+| Umfang        | nur `skills`             | skills, agents, commands, rules, plugins |
+| Stabilität    | EXPERIMENTAL             | stabile Flags                            |
 
 Die zweite Zeile ist die wichtigste — und beim Bauen dieses Repos nachgemessen:
 Der Store ist beschreibbar und wird von **allen** Sandboxes der Maschine geteilt.
@@ -81,12 +81,12 @@ widerspricht dem Zweck einer Sandbox.
 `sbx` hängt seinen Store an **genau den Pfad**, an den auch unser Symlink
 gehört: `/home/agent/.claude/skills`. Sichtbar schon beim Anlegen:
 
-```
+```bash
 skills  .../com.docker.sandboxes/sandboxes/agent-skills → /home/agent/.claude/skills
 ```
 
 Ein `ln -sfn` dorthin **schlägt nicht fehl** — es meldet Erfolg und legt den Link
-*in* das eingehängte Verzeichnis. Damit läge unsere Konfiguration in jeder
+_in_ das eingehängte Verzeichnis. Damit läge unsere Konfiguration in jeder
 anderen Sandbox des Rechners. Ein stiller Seiteneffekt über Sandbox-Grenzen
 hinweg, der ohne einen praktischen Test unentdeckt geblieben wäre.
 
@@ -103,7 +103,7 @@ Ein `--no-share-skills`-Flag erwähnt `sbx skills --help`. In `sbx create --help
 und `sbx run --help` taucht es **nicht** auf — angenommen wird es von beiden
 trotzdem. Nachgemessen in v0.38.0 über die Fehlermeldung, die zurückkommt:
 
-```
+```bash
 $ sbx create --no-share-skills claude
 ERROR: requires at least 1 argument: PATH      # Flag akzeptiert, Pfad fehlt
 
@@ -148,7 +148,7 @@ geteilter, beschreibbarer Store und Kopie statt Live-Mount.
 - Ohne `:ro` könnte ein Agent globale Skills verändern, die dann auf dem Host
   für **alle** Projekte gelten — ein Weg aus der Sandbox heraus.
 
-**Warum Symlinks?** Extra-Workspaces werden unter ihrem absoluten *Host*-Pfad
+**Warum Symlinks?** Extra-Workspaces werden unter ihrem absoluten _Host_-Pfad
 eingehängt (`/Users/du/.claude/skills`), Claude sucht aber in
 `/home/agent/.claude/skills`. Der Symlink verbindet beides.
 
@@ -187,12 +187,12 @@ herauskommt, und zu wissen wie man das ändert, ist selbst Teil des Stoffs.
 
 devbox ist so benannt, dass es sich mit keinem anderen `sbx`-Setup überschneidet:
 
-| | devbox | Typische Alternative |
-|---|---|---|
-| Ordner im Repo | `devbox/` | `sbx/` |
-| Sandbox-Namen | `devbox-*` | `claude-*` |
-| Template | `devbox/base` | agent-spezifisch |
-| Zustand | `~/.local/state/devbox` | anderswo |
+|                | devbox                  | Typische Alternative |
+| -------------- | ----------------------- | -------------------- |
+| Ordner im Repo | `devbox/`               | `sbx/`               |
+| Sandbox-Namen  | `devbox-*`              | `claude-*`           |
+| Template       | `devbox/base`           | agent-spezifisch     |
+| Zustand        | `~/.local/state/devbox` | anderswo             |
 
 Der Ordnername ist kein Detail: Manche Wrapper erkennen ein Verzeichnis namens
 `sbx/` im Git-Root **automatisch** und schalten daraufhin in einen Sondermodus
@@ -258,7 +258,7 @@ Eine Sandbox für alle Projekte hat ein Problem, das devbox nicht hat: `sbx run`
 startet den Agenten im **Primary Workspace**. Claude Code liest die
 projektlokale Konfiguration aber beim **Start** aus dem Arbeitsverzeichnis — ein
 `cd` in der laufenden Sitzung holt sie nicht nach. Eine Sandbox mit
-Dach-Ordner-Mount würde also *immer* ohne Projektkontext starten.
+Dach-Ordner-Mount würde also _immer_ ohne Projektkontext starten.
 
 Die Lösung hängt an einer Eigenschaft, die devbox nur nebenbei nutzt: zusätzliche
 Workspaces werden unter ihrem **absoluten Host-Pfad** eingehängt. Host-Pfad und
@@ -281,18 +281,18 @@ nach dem Anlegen läuft über `sbx run` — dort passiert der Login.
 ### `settings.json`: ableiten statt mounten
 
 devbox lässt die Host-`settings.json` komplett draußen und erzeugt im
-`SHARE_ALL`-Modus eine mit *nur* `enabledPlugins`. solobox braucht mehr, weil es
+`SHARE_ALL`-Modus eine mit _nur_ `enabledPlugins`. solobox braucht mehr, weil es
 auch Hooks mitbringen soll — nimmt aber weiterhin nicht die Datei selbst,
 sondern leitet ab:
 
-| Übernommen | Warum |
-|---|---|
+| Übernommen                                 | Warum                                                           |
+| ------------------------------------------ | --------------------------------------------------------------- |
 | `enabledPlugins`, `extraKnownMarketplaces` | gehören zusammen, sonst findet die Sandbox den Marktplatz nicht |
-| `model`, `effortLevel` | reine Vorlieben, host-unabhängig |
-| `hooks` abzüglich `HOOK_SKIP` | siehe unten |
+| `model`, `effortLevel`                     | reine Vorlieben, host-unabhängig                                |
+| `hooks` abzüglich `HOOK_SKIP`              | siehe unten                                                     |
 
-| Gesetzt statt kopiert | Warum |
-|---|---|
+| Gesetzt statt kopiert                                                                | Warum                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `permissions.defaultMode` (Standard `acceptEdits`, per `PERMISSION_MODE` umstellbar) | in der Sandbox darf Claude Dateien ohne Rückfrage ändern — aber **nicht** `bypassPermissions`, weil `~/dev` echt eingehängt und beschreibbar ist. Die Sandbox schützt den Host, nicht die Projekte. |
 
 Dazu ein Detail, das man nur beim Hineinsehen findet: Das Image hinterlässt
@@ -337,10 +337,10 @@ Rückfragen auch für sandkastenfähige Befehle will, nimmt
 Bewusst nicht voreingestellt: eine Rückfrage pro `ls` ist Reibung ohne
 Gegenwert, solange der Radius ohnehin das Projekt ist.
 
-| Draußen | Warum |
-|---|---|
+| Draußen                             | Warum                                                            |
+| ----------------------------------- | ---------------------------------------------------------------- |
 | `permissions.allow/deny`, `sandbox` | Pfade und Regeln des Hosts, im Container bestenfalls wirkungslos |
-| `theme`, `voice`, `tui` | gerätespezifisch |
+| `theme`, `voice`, `tui`             | gerätespezifisch                                                 |
 
 ### Hooks sind nicht portabel
 
@@ -372,13 +372,13 @@ das nicht gewollt ist, gibt es `--no-share-skills`. Drei Entscheidungen dazu:
 
 ### Was solobox aufgibt
 
-| Aufgegeben | Konsequenz |
-|---|---|
-| Trennung privat/beruflich | eine Sandbox sieht alles unter der Wurzel |
-| Getrennte Netzregeln | eine Liste für alles |
-| Getrennter Laufzeitzustand | globale npm-Pakete teilen sich eine Sandbox |
-| Wahlfreiheit beim zweiten Mal | `ROOTS` steht nach dem Anlegen fest |
-| Trennung zum Skill-Store | Standard ist geteilt (umschaltbar) |
+| Aufgegeben                    | Konsequenz                                  |
+| ----------------------------- | ------------------------------------------- |
+| Trennung privat/beruflich     | eine Sandbox sieht alles unter der Wurzel   |
+| Getrennte Netzregeln          | eine Liste für alles                        |
+| Getrennter Laufzeitzustand    | globale npm-Pakete teilen sich eine Sandbox |
+| Wahlfreiheit beim zweiten Mal | `ROOTS` steht nach dem Anlegen fest         |
+| Trennung zum Skill-Store      | Standard ist geteilt (umschaltbar)          |
 
 Was **nicht** aufgegeben wird, weil es nichts kostet: `.credentials.json` bleibt
 draußen, `settings.json` wird nicht gemountet, Netzregeln bleiben
@@ -386,12 +386,12 @@ draußen, `settings.json` wird nicht gemountet, Netzregeln bleiben
 
 ---
 
-## Was bewusst *nicht* gemacht wurde
+## Was bewusst _nicht_ gemacht wurde
 
-| Nicht gemacht | Warum |
-|---|---|
-| Zentrales Image in einer Registry | Jeder soll sein eigenes Repo und Image besitzen und frei ändern können |
-| Automatische Repo-Erkennung per Git-Remote | Erzeugt eine Sandbox pro Projekt — genau das, was wir loswerden wollten |
-| Globale Netz-Policy | Würde parallele Setups mitverändern |
-| `settings.json` mounten | Host-Berechtigungen gehören nicht in einen Container |
-| `sbx kit` / `sbx skills` im kritischen Pfad | EXPERIMENTAL |
+| Nicht gemacht                               | Warum                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| Zentrales Image in einer Registry           | Jeder soll sein eigenes Repo und Image besitzen und frei ändern können  |
+| Automatische Repo-Erkennung per Git-Remote  | Erzeugt eine Sandbox pro Projekt — genau das, was wir loswerden wollten |
+| Globale Netz-Policy                         | Würde parallele Setups mitverändern                                     |
+| `settings.json` mounten                     | Host-Berechtigungen gehören nicht in einen Container                    |
+| `sbx kit` / `sbx skills` im kritischen Pfad | EXPERIMENTAL                                                            |

@@ -74,10 +74,10 @@ sbx exec solobox bash -lc 'jq -c "{defaultMode, bypassPermissionsModeAccepted}" 
 Vor der Ableitung:
 
 ```json
-{"defaultMode":"bypassPermissions","bypassPermissionsModeAccepted":true}
+{ "defaultMode": "bypassPermissions", "bypassPermissionsModeAccepted": true }
 ```
 
-Das schreibt das **Image** dorthin, und zwar auf die *oberste* Ebene — während
+Das schreibt das **Image** dorthin, und zwar auf die _oberste_ Ebene — während
 der dokumentierte Schlüssel `permissions.defaultMode` heißt. Setzt man nur
 letzteren, sagt die Datei anschließend zweierlei, und welche Angabe gewinnt,
 steht nirgends.
@@ -86,7 +86,7 @@ Deshalb entfernt solobox die beiden Schlüssel des Images, sobald ein anderer
 Modus als `bypassPermissions` gewünscht ist. Danach:
 
 ```json
-{"defaultMode":null,"bypassPermissionsModeAccepted":null}
+{ "defaultMode": null, "bypassPermissionsModeAccepted": null }
 ```
 
 und in `permissions.defaultMode` steht genau ein Wert.
@@ -109,22 +109,23 @@ sbx exec solobox bash -lc 'ps -eo pid,etime,args | grep [c]laude'
 
 Nach einem Start über `sbx run`:
 
-```
-457   20:08   claude --dangerously-skip-permissions
-```
+bash
+457 20:08 claude --dangerously-skip-permissions
+
+```bash
 
 **`sbx run` startet den Agenten mit abgeschalteten Berechtigungen.** Das ist aus
-Sicht von `sbx` konsequent — die Sandbox *ist* dort die Grenze. Für die
+Sicht von `sbx` konsequent — die Sandbox _ist_ dort die Grenze. Für die
 `settings.json` heißt es: in dieser Sitzung ist sie gegenstandslos, egal was
 darin steht.
 
 Ein über `sbx exec … claude` gestarteter Agent bekommt dieses Flag **nicht**.
 Genau deshalb unterscheiden sich die beiden Startwege von `solobox up`:
 
-| Start | Kommando | Berechtigungen |
-|---|---|---|
-| erstmalig, nach dem Anlegen | `sbx run --name solobox claude` | abgeschaltet (Flag von sbx) |
-| jedes weitere Mal | `sbx exec -it -w "$PWD" solobox claude` | wie in `settings.json` |
+| Start                       | Kommando                                | Berechtigungen              |
+| --------------------------- | --------------------------------------- | --------------------------- |
+| erstmalig, nach dem Anlegen | `sbx run --name solobox claude`         | abgeschaltet (Flag von sbx) |
+| jedes weitere Mal           | `sbx exec -it -w "$PWD" solobox claude` | wie in `settings.json`      |
 
 Willst du die Rückfragen prüfen, beende die erste Sitzung und starte neu — sonst
 misst du das Flag und nicht deine Einstellung.
@@ -133,18 +134,20 @@ misst du das Flag und nicht deine Einstellung.
 
 Startet man neu, ohne das Flag, und bittet Claude um ein `date` über das
 Bash-Tool — kommt **immer noch keine Rückfrage**. Diesmal liegt es weder am Flag
-noch an der Datei, sondern daran, dass Claude Code in der Sandbox *seinen
-eigenen* Bash-Sandkasten betreibt und Befehle, die darin laufen, ohne Rückfrage
+noch an der Datei, sondern daran, dass Claude Code in der Sandbox _seinen
+eigenen_ Bash-Sandkasten betreibt und Befehle, die darin laufen, ohne Rückfrage
 zulässt (`autoAllowBashIfSandboxed`).
 
 Das ist keine Vermutung. Nachgemessen mit zwei Schreibversuchen aus einer
 Sitzung, die in `~/dev/own` gestartet wurde:
 
 ```
-A: touch /Users/du/dev/own/PROBE-A   -> OK
-B: touch /home/agent/PROBE-B         -> FEHLER: Schreibzugriff außerhalb des
-                                        erlaubten Arbeitsverzeichnisses blockiert
-```
+
+A: touch /Users/du/dev/own/PROBE-A -> OK
+B: touch /home/agent/PROBE-B -> FEHLER: Schreibzugriff außerhalb des
+erlaubten Arbeitsverzeichnisses blockiert
+
+````bash
 
 > 🎯 **Die Bremse ist nicht die Rückfrage, sondern das Arbeitsverzeichnis.**
 > Innerhalb des Ordners, in dem Claude gestartet wurde, arbeitet der Agent frei.
@@ -159,12 +162,12 @@ nicht an einer Einstellung.
 **Was `PERMISSION_MODE` dann noch tut:** Es greift für alles, was der innere
 Sandkasten nicht abdeckt — und es ist der Schalter, wenn du die Voreinstellung
 des Images (`bypassPermissions`) bewusst zurückholen willst. Wer umgekehrt
-*echte* Rückfragen auch für sandkastenfähige Befehle will, schaltet die
+_echte_ Rückfragen auch für sandkastenfähige Befehle will, schaltet die
 Automatik ab, indem er in die abgeleitete `settings.json` aufnimmt:
 
 ```json
 "sandbox": { "autoAllowBashIfSandboxed": false }
-```
+````
 
 Das ist bewusst nicht die Voreinstellung: eine Rückfrage pro `ls` ist Reibung
 ohne Gegenwert, solange der Radius ohnehin auf das Projekt begrenzt ist.
@@ -199,7 +202,7 @@ sbx exec -it -w "$PWD" solobox claude
 Beim Abschluss der Antwort feuert der `Stop`-Hook. Auf deinem Mac schickt er
 eine Desktop-Benachrichtigung. In einem Linux-Container passiert das:
 
-```
+```bash
 osascript: command not found
 ```
 
@@ -230,9 +233,11 @@ Hooks ausnehmen, tragen sie sich dort ein.
 
 > **Alternative, falls dir die Benachrichtigungen wichtig sind:** Mach
 > `notify.sh` auf dem Host verträglich — eine Zeile am Anfang genügt:
+>
 > ```bash
 > command -v osascript >/dev/null 2>&1 || command -v terminal-notifier >/dev/null 2>&1 || exit 0
 > ```
+>
 > Dann darf `HOOK_SKIP=()` leer bleiben. Das ändert allerdings eine Datei
 > außerhalb dieses Repos — deshalb ist es nicht der Standardweg.
 
@@ -245,7 +250,7 @@ cd ~/dev/own/mein-projekt
 sbx exec -it -w "$PWD" solobox claude
 ```
 
-```
+```bash
 /plugin
 ```
 
@@ -260,13 +265,15 @@ Warnung bleibt oder ein Fehler wird:
 1. Claude in der Sandbox starten und ein paar Minuten normal arbeiten. Erwartet:
    keine Meldung. Ein stiller Schreibfehler beim Cache-Sweep ist harmlos.
 2. Bewusst provozieren:
-   ```
-   /plugin
-   ```
-   und versuchen, ein Plugin zu installieren. **Erwartet: das scheitert** — und
-   zwar richtig so. Plugins installierst du auf dem **Host**, die Sandbox nutzt
-   sie nur. Nach der Installation auf dem Host holt `solobox sync` sie in die
-   laufende Sandbox.
+
+    ```bash
+    /plugin
+    ```
+
+    und versuchen, ein Plugin zu installieren. **Erwartet: das scheitert** — und
+    zwar richtig so. Plugins installierst du auf dem **Host**, die Sandbox nutzt
+    sie nur. Nach der Installation auf dem Host holt `solobox sync` sie in die
+    laufende Sandbox.
 
 **Wenn stattdessen bei jedem Start eine Fehlermeldung erscheint** oder Plugins
 gar nicht erst laden: dann reicht read-only nicht, und der Ordner muss kopiert
@@ -286,7 +293,7 @@ Der Mount hält also, was er verspricht. Und er stört nicht: In mehreren
 Sitzungen kam keine Fehlermeldung, alle fünf Plugins waren aktiv, und der
 MCP-Server eines Plugins meldete sich verbunden:
 
-```
+```bash
 plugin:grepika:grepika: npx -y @agentika/grepika@latest --mcp - ✔ Connected
 ```
 
