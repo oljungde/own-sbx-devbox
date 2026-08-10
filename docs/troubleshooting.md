@@ -2,6 +2,10 @@
 
 Die Probleme in der Reihenfolge, in der sie erfahrungsgemäß auftreten.
 
+Der größte Teil gilt für **beide Varianten** — die Fehler stecken in `sbx`, nicht
+im Wrapper. Was nur `solobox` betrifft, steht gesammelt am
+[Ende dieser Seite](#nur-solobox-variante-2).
+
 ---
 
 ## Windows: `./devbox/devbox.sh` wird nicht erkannt
@@ -323,3 +327,188 @@ Das Image belegt rund 5,9 GB, die tar-Datei beim Übertragen etwa 1,4 GB
 - Aufräumen: `docker image prune` und alte `devbox/base`-Versionen entfernen.
 - Wer Playwright nicht braucht: Schritt 7 aus dem Dockerfile entfernen, das
   spart mehrere GB.
+
+---
+
+# Nur solobox (Variante 2)
+
+## `solobox: command not found`
+
+Der Symlink fehlt oder liegt nicht auf dem `PATH`:
+
+```bash
+chmod +x solobox/solobox.sh
+./solobox/solobox.sh install
+solobox doctor
+```
+
+`install` sagt dir, wenn `~/.local/bin` nicht auf dem `PATH` liegt.
+
+## `permission denied` beim Aufruf
+
+Dem Skript fehlt das Ausführbar-Bit — bei frisch geschriebenen Dateien der
+Normalfall:
+
+```bash
+chmod +x solobox/solobox.sh
+```
+
+Genau das prüft die CI mit `test -x`, damit es niemandem sonst passiert.
+
+## `workspace path exists but is not a directory`
+
+```
+ERROR: workspace path exists but is not a directory: /Users/du/.gitconfig
+```
+
+`sbx` hängt als Workspace **nur Verzeichnisse** ein. Steht in `ROOTS` eine
+einzelne Datei, bricht das Anlegen ab. Seit dieser Fassung prüft der Wrapper das
+vorher und sagt es deutlicher — `solobox doctor` zeigt es ebenfalls an.
+
+Eine einzelne Datei bringst du mit `sbx cp` hinein. Für die **Git-Identität**
+brauchst du das nicht: solobox liest `user.name` und `user.email` vom Host und
+setzt sie bei jedem `up` in der Sandbox (`apply_git_identity`). Das ist auch der
+bessere Weg — eine echte `~/.gitconfig` enthält oft `includeIf`-Blöcke und
+Credential-Helfer-Pfade, die im Container ins Leere zeigen.
+
+## Commits aus der Sandbox haben keinen Autor
+
+```
+Author identity unknown
+```
+
+Auf dem Host ist keine globale Identität gesetzt, also kann solobox auch keine
+übernehmen:
+
+```bash
+git config --global user.name  "Dein Name"
+git config --global user.email "du@example.com"
+solobox sync
+```
+
+## Der projektlokale Skill / die `CLAUDE.md` wird ignoriert
+
+Fast immer wurde Claude **nicht im Projektordner gestartet**. Claude Code liest
+`CLAUDE.md`, `.claude/` und `.mcp.json` beim **Start** aus dem
+Arbeitsverzeichnis; ein `cd` in der laufenden Sitzung holt das nicht nach.
+
+```
+/status          # zeigt das Arbeitsverzeichnis
+```
+
+Steht dort die Wurzel (`~/dev`) statt deines Projekts, dann beenden und neu:
+
+```bash
+cd ~/dev/own/mein-projekt
+solobox up
+```
+
+## „liegt unter keiner der Wurzeln"
+
+```
+!! '/Users/du/woanders' liegt unter keiner der Wurzeln (/Users/du/dev ...)
+```
+
+Die Sandbox sieht diesen Ordner nicht. Workspaces stehen beim Anlegen fest — der
+Ordner lässt sich **nicht** nachreichen. Entweder das Projekt unter eine
+bestehende Wurzel verschieben, oder:
+
+```bash
+$EDITOR ~/.config/solobox/solobox.conf     # ROOTS ergänzen
+solobox rm && solobox up                   # kostet den Login
+```
+
+## Nach jeder Antwort erscheint ein Hook-Fehler
+
+```
+osascript: command not found
+```
+
+Ein Hook aus deiner globalen `settings.json` ruft Host-Werkzeuge auf, die es im
+Container nicht gibt (`osascript`, `terminal-notifier`, `open`, `pbcopy`). Diese
+Hooks gehören in `HOOK_SKIP`:
+
+```bash
+HOOK_SKIP=(Notification Stop)   # Standard
+```
+
+`solobox sync` schreibt die Datei danach neu. Alternativ den Hook auf dem Host
+verträglich machen — die Zeile dafür steht in
+[Tutorial-Kapitel 3](tutorial-solo/03-hooks-plugins-settings.md).
+
+## Ein neuer Skill vom Host fehlt in der Sandbox
+
+Skills werden **kopiert**, nicht gemountet (sonst würde der Link im geteilten
+sbx-Store landen). Nachziehen:
+
+```bash
+solobox sync
+```
+
+Die laufende Claude-Sitzung sieht ihn nach einem Neustart der Sitzung.
+
+Für Agents, Commands, Rules und Plugins gilt das **nicht** — die sind gemountet
+und sofort aktuell.
+
+## Andere Sandboxes sehen plötzlich meine globalen Skills
+
+Kein Fehler, sondern der Standard: `/home/agent/.claude/skills` ist der
+Skill-Store von `sbx`, den sich alle Sandboxes der Maschine teilen.
+
+```bash
+solobox status     # zeigt, wer sich den Store mit dir teilt
+```
+
+Wenn das nicht gewollt ist:
+
+```bash
+ISOLATE_SKILLS=1   # in ~/.config/solobox/solobox.conf
+solobox rm && solobox up
+```
+
+`solobox doctor` prüft vorher, ob deine `sbx`-Version das dafür nötige
+(undokumentierte) `--no-share-skills` überhaupt kennt.
+
+## Claude fragt vor einem Bash-Befehl nicht nach
+
+Erwartet, und zwar aus bis zu drei Gründen — in dieser Reihenfolge prüfen:
+
+**1. Läuft die Sitzung mit abgeschalteten Berechtigungen?**
+
+```bash
+sbx exec solobox bash -lc 'ps -eo pid,etime,args | grep [c]laude'
+```
+
+Steht dort `claude --dangerously-skip-permissions`, wurde sie über `sbx run`
+gestartet — das tut `solobox up` nur beim allerersten Mal nach dem Anlegen.
+`/exit`, dann `solobox up` erneut; die neue Sitzung läuft ohne das Flag.
+
+**2. Der Befehl lief in Claudes eigenem Sandkasten.**
+Claude Code sandboxt Bash-Aufrufe in der Sandbox selbst und lässt sie dann ohne
+Rückfrage zu (`autoAllowBashIfSandboxed`). Das ist der Normalfall und kein
+Fehler.
+
+**3. Die eigentliche Grenze ist das Arbeitsverzeichnis.**
+Schreibversuche außerhalb des Ordners, in dem Claude gestartet wurde, werden
+hart abgewiesen:
+
+```
+Schreibzugriff außerhalb des erlaubten Arbeitsverzeichnisses blockiert
+```
+
+Wer echte Rückfragen will, nimmt `"sandbox": {"autoAllowBashIfSandboxed": false}`
+in die abgeleitete `settings.json` auf. Wer weniger Radius will, startet
+`solobox up` im Projekt statt in `~/dev` — das wirkt stärker als jede
+Einstellung.
+
+## `/plugin` kann in der Sandbox nichts installieren
+
+Erwartet. `~/.claude/plugins` ist **read-only** eingehängt. Plugins installierst
+du auf dem Host; danach holt `solobox sync` sie in die laufende Sandbox.
+
+## `solobox status` sagt „Template vorhanden, Herkunft unbekannt"
+
+Das Template liegt im sbx-Store, aber im State-Ordner
+(`~/.local/state/solobox/image.hash`) steht kein Merkzettel — typisch, wenn das
+Image von Hand mit `docker save` + `sbx template load` geladen wurde. Harmlos.
+Ein `solobox build --force` legt den Merkzettel an.

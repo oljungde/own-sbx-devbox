@@ -1,0 +1,120 @@
+# =============================================================================
+# solobox — Konfiguration (OPTIONAL)
+#
+# Anders als bei devbox brauchst du diese Datei NICHT. Ohne sie gelten die
+# Standardwerte, die oben in solobox.sh stehen — `solobox up` läuft also sofort.
+# Was `doctor` als Standard anzeigt, kannst du hier übersteuern:
+#
+#   mkdir -p ~/.config/solobox
+#   cp solobox/solobox.conf.example ~/.config/solobox/solobox.conf
+#
+# Die Datei wird von solobox.sh eingelesen (`source`) und ist ganz normales
+# Bash. Es gibt kein Profil und kein `case` — es gibt genau eine Sandbox.
+# =============================================================================
+
+# --- ROOTS: was die Sandbox sieht -------------------------------------------
+#
+# ⚠️  Die einzige Ein-Weg-Entscheidung. sbx nimmt Workspaces NUR beim Anlegen
+#     entgegen. Was hier beim ersten `solobox up` fehlt, bekommst du später nur
+#     mit `solobox rm` + `solobox up` dazu — und das kostet den Claude-Login und
+#     alles, was in der Sandbox installiert wurde.
+#     Deshalb: Dach-Ordner eintragen, nicht einzelne Projekte.
+#
+# Der ERSTE Eintrag ist der Primary Workspace — dort landet Claude, wenn du
+# `solobox up` außerhalb aller Wurzeln aufrufst.
+# Ein ":ro" am Ende hängt den Pfad schreibgeschützt ein.
+#
+# ⚠️  NUR VERZEICHNISSE. Eine einzelne Datei lehnt sbx ab:
+#       ERROR: workspace path exists but is not a directory: /Users/du/.gitconfig
+#     Für die Git-Identität musst du deshalb nichts eintragen — solobox liest
+#     user.name und user.email vom Host und setzt sie in der Sandbox.
+#
+# ROOTS=(
+#   "$HOME/dev"       # Standard: alle Projekte auf einmal
+#   "$HOME/work"      # ein zweiter Dach-Ordner, falls deiner woanders liegt
+#   "$HOME/.ssh:ro"   # NUR wenn du wirklich aus der Sandbox pushen willst
+# )
+
+# --- EXTRA_HOSTS: zusätzliche Netzziele --------------------------------------
+#
+# Die Grundliste steht in solobox.sh (BASE_HOSTS). Alles, was ein Projekt oder
+# ein MCP-Server sonst noch braucht, kommt hier dazu. Zum Ausprobieren reicht
+# `solobox allow <host>` — das gilt aber nur bis zum nächsten Neuanlegen.
+#
+# EXTRA_HOSTS=(
+#   'packages.cloud.google.com'   # falls du den gcloud-Block im Dockerfile aktivierst
+#   '*.googleapis.com'
+#   '*.sentry.io'
+# )
+
+# --- MCP_SERVERS: was bei jedem Start hineingereicht wird ---------------------
+#
+# Server, die auf dem HOST mit `sbx mcp add` registriert wurden. Sie laufen
+# außerhalb der Sandbox; sbx reicht sie über sein Gateway hinein. Genau dafür
+# ist dieser Weg da: die OAuth-Anmeldung passiert einmal auf dem Host, nicht in
+# jeder Sandbox.
+#
+#   sbx mcp add linear --url https://mcp.linear.app/mcp
+#   sbx mcp auth linear
+#   sbx mcp ls
+#
+# Lokale stdio-Server kann `sbx mcp add` ebenfalls:
+#   sbx mcp add github --command npx --args @modelcontextprotocol/server-github
+#
+# MCP-Server, die deine PLUGINS mitbringen, gehören hier NICHT hinein — die sind
+# automatisch da, sobald das Plugin aktiv ist.
+#
+# MCP_SERVERS=(
+#   linear
+# )
+
+# --- HOOK_SKIP: welche Hooks in der Sandbox NICHT gelten ---------------------
+#
+# solobox leitet aus deiner globalen settings.json eine eigene für die Sandbox
+# ab und übernimmt dabei die Hooks. Nicht jeder Hook ergibt im Container Sinn:
+# Desktop-Benachrichtigungen rufen `terminal-notifier` oder `osascript` auf —
+# beides gibt es in Linux nicht, und der Hook endet dann mit einem Fehler.
+#
+# Voreingestellt ist deshalb, Notification und Stop wegzulassen. Willst du ALLE
+# Hooks (und die Fehlermeldung sehen), setze eine leere Liste.
+#
+# HOOK_SKIP=(Notification Stop)
+# HOOK_SKIP=()
+
+# --- PERMISSION_MODE: wie viel Claude in der Sandbox ohne Rückfrage darf ------
+#
+# Erlaubt: acceptEdits (Standard), default, plan, bypassPermissions.
+#
+# Das Basis-Image startet Claude mit `bypassPermissions` — dort gilt die Sandbox
+# als die Grenze, drinnen fragt nichts mehr nach. Für solobox stimmt das nur
+# halb: `~/dev` ist ECHT eingehängt und beschreibbar. Die Sandbox schützt deinen
+# Host, nicht deine Projektdateien.
+#
+# Voreinstellung ist `acceptEdits`. Erwarte davon aber keine Rückfrage bei jedem
+# Bash-Aufruf: Claude Code betreibt in der Sandbox einen eigenen Bash-Sandkasten
+# und lässt Befehle, die darin laufen, ohne Rückfrage zu. Die wirksame Grenze ist
+# das Arbeitsverzeichnis — außerhalb wird ein Schreibversuch hart geblockt.
+# Deshalb startet `solobox up` im Projekt: das begrenzt den Radius.
+# Wer die Voreinstellung des Images zurückwill, setzt bypassPermissions.
+#
+# PERMISSION_MODE="acceptEdits"
+
+# --- ISOLATE_SKILLS: eigener oder geteilter Skill-Store ----------------------
+#
+# Standard ist 0: deine globalen Skills werden nach /home/agent/.claude/skills
+# kopiert — und das ist der Skill-Store von sbx, den sich ALLE Sandboxes dieser
+# Maschine teilen. Auf einem Rechner, auf dem nur deine eigenen Sandboxes
+# laufen, ist das die gewollte Bequemlichkeit: du legst einen Skill einmal ab
+# und hast ihn überall.
+#
+# Auf einem GETEILTEN Rechner ist es ein Seitenkanal. Dann gehört hier eine 1
+# hin: solobox legt die Sandbox mit `--no-share-skills` an und bekommt einen
+# eigenen Store.
+#
+# ⚠️  Dieses Flag ist in `sbx create --help` nicht dokumentiert (es gehört zum
+#     als EXPERIMENTAL markierten `sbx skills`) und kann in einer künftigen
+#     Version verschwinden. `solobox doctor` prüft, ob deine sbx-Version es
+#     kennt. Wer sich `solobox status` ansieht, sieht jederzeit, wer sich den
+#     Store mit ihm teilt.
+#
+# ISOLATE_SKILLS=1

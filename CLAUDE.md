@@ -1,7 +1,19 @@
 # devbox
 
-Dieses Repo baut eine Claude-Sandbox auf Basis von Docker Sandboxes (`sbx`).
+Dieses Repo baut Claude-Sandboxes auf Basis von Docker Sandboxes (`sbx`).
 Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
+
+Es gibt **zwei Varianten**, die sich nichts teilen und nebeneinander laufen:
+
+| | `devbox/` (Variante 1) | `solobox/` (Variante 2) |
+| --- | --- | --- |
+| Sandboxes | eine pro Profil | genau eine, systemweit |
+| Aufruf | `./devbox/devbox.sh up privat` | `solobox up` im Projektordner |
+| Conf | Pflicht | optional |
+| Globales aus `~/.claude` | über `SHARE_ALL` zuschaltbar | immer, inkl. Hooks und Plugins |
+
+Änderst du eine Variante, ist die andere **nicht** automatisch betroffen — aber
+prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
 
 ## Wichtig beim Arbeiten an diesem Repo
 
@@ -20,30 +32,57 @@ Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
 - **Nichts `sbx/` nennen.** Fremde Wrapper erkennen diesen Ordnernamen im
   Git-Root automatisch und kapern sonst dieses Repo.
 - Ändert sich das Verhalten, muss das passende Tutorial-Kapitel unter
-  `docs/tutorial/` mitgezogen werden.
+  `docs/tutorial/` bzw. `docs/tutorial-solo/` mitgezogen werden.
+
+## Zusätzlich für `solobox/`
+
+- **Die eine Ausnahme von der Flag-Regel:** `--no-share-skills` ist in
+  `sbx create --help` nicht dokumentiert und gehört zum EXPERIMENTAL-Kommando
+  `sbx skills`. Es steht deshalb **nicht** im Standardweg, sondern hinter
+  `ISOLATE_SKILLS=1`, und `supports_no_share_skills()` prüft vorher, ob die
+  installierte `sbx`-Version es überhaupt kennt. Ohne diese Prüfung darf es
+  nirgends verwendet werden.
+- **Skills werden kopiert, nie verlinkt.** Grund steht bei `CLAUDE_LINKED`.
+- **`settings.json` wird abgeleitet, nie gemountet.** Übernommen werden nur
+  `enabledPlugins`, `extraKnownMarketplaces`, `model`, `effortLevel` und die
+  Hooks abzüglich `HOOK_SKIP`. `permissions.defaultMode` wird auf `acceptEdits`
+  **gesetzt** — nicht `bypassPermissions`, weil `~/dev` echt eingehängt ist.
+- **`up` startet im aktuellen Verzeichnis** (`sbx exec -w`). Wer das ändert,
+  bricht die projektlokale Konfiguration — Claude liest sie beim Start aus dem
+  Arbeitsverzeichnis.
+- **pnpm nie über `corepack`.** Die Aktivierung landet im Cache des Bau-Users,
+  und `agent` lädt zur Laufzeit still eine andere Version nach. Nachgemessen,
+  siehe Kommentar im Dockerfile.
 
 ## Aufbau
 
-| Pfad                         | Inhalt                                          |
-| ---------------------------- | ----------------------------------------------- |
-| `devbox/Dockerfile`          | Toolchain des Images                            |
-| `devbox/devbox.sh`           | Wrapper um `sbx` (der Hauptweg)                 |
-| `devbox/devbox.conf.example` | Profilvorlage                                   |
-| `devbox/kit/kit.yaml`        | deklarative Variante (Kür)                      |
-| `docs/tutorial/`             | Tutorial: Kapitel 0 (Setup) plus sieben Kapitel |
-| `docs/cheatsheet.md`         | alle Kommandos auf einer Seite                  |
-| `docs/architektur.md`        | die Begründungen                                |
-| `docs/troubleshooting.md`    | Fehlersuche                                     |
-| `scripts/check-links.sh`     | prüft relative Links in der Doku                |
-| `.github/workflows/ci.yml`   | shellcheck + Linkprüfung                        |
+| Pfad                           | Inhalt                                          |
+| ------------------------------ | ----------------------------------------------- |
+| `devbox/Dockerfile`            | Toolchain des Images (Variante 1)               |
+| `devbox/devbox.sh`             | Wrapper um `sbx` (der Hauptweg)                 |
+| `devbox/devbox.conf.example`   | Profilvorlage                                   |
+| `devbox/kit/kit.yaml`          | deklarative Variante (Kür)                      |
+| `solobox/Dockerfile`           | Toolchain des Images (Variante 2)               |
+| `solobox/solobox.sh`           | Wrapper für die eine Sandbox                    |
+| `solobox/solobox.conf.example` | Konfigurationsvorlage (optional)                |
+| `docs/tutorial/`               | Tutorial Variante 1: Kapitel 0 plus sieben      |
+| `docs/tutorial-solo/`          | Tutorial Variante 2: sieben Kapitel             |
+| `docs/cheatsheet.md`           | alle Kommandos von Variante 1                   |
+| `docs/cheatsheet-solo.md`      | alle Kommandos von Variante 2                   |
+| `docs/architektur.md`          | die Begründungen (beide Varianten)              |
+| `docs/troubleshooting.md`      | Fehlersuche (beide Varianten)                   |
+| `scripts/check-links.sh`       | prüft relative Links in der Doku                |
+| `.github/workflows/ci.yml`     | shellcheck + Linkprüfung                        |
 
 ## Vor dem Commit
 
 Genau das, was die CI prüft:
 
 ```bash
-shellcheck devbox/devbox.sh scripts/check-links.sh
+shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
 bash -n devbox/devbox.conf.example
+bash -n solobox/solobox.conf.example
+test -x devbox/devbox.sh && test -x solobox/solobox.sh
 ./scripts/check-links.sh
 ```
 
@@ -55,6 +94,10 @@ Kein `shellcheck` zur Hand:
 ```bash
 ./devbox/devbox.sh update
 docker run --rm devbox/base:latest bash -lc 'python --version; pnpm --version'
+
+# Variante 2
+./solobox/solobox.sh update
+docker run --rm solobox/base:latest bash -lc 'python --version; pnpm --version; gcc --version | head -1'
 ```
 
 `pnpm --version` darf **keine** Corepack-Download-Meldung zeigen.

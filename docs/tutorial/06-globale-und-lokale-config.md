@@ -43,7 +43,7 @@ Drei bewusste Entscheidungen dahinter:
 `.credentials.json` im Container.
 
 **`:ro` ist Pflicht.** Ohne Schreibschutz könnte ein Agent im Container deine
-globalen Skills verändern — und die gelten dann auf dem Host für *alle* deine
+globalen Skills verändern — und die gelten dann auf dem Host für _alle_ deine
 Projekte. Das wäre ein Weg aus der Sandbox heraus.
 
 **`settings.json` bleibt draußen.** Da stehen Berechtigungen für deinen Host
@@ -82,18 +82,19 @@ Du solltest vier Symlinks sehen, die auf die gemounteten Pfade zeigen.
 
 Das ist kein Vertipper. Schau dir an, was `sbx create` beim Anlegen ausgibt:
 
-```
+```bash
 skills  .../com.docker.sandboxes/sandboxes/agent-skills → /home/agent/.claude/skills
 ```
 
 **`sbx` hängt an genau diesem Pfad seinen eigenen Skill-Store ein** — und zwar
-denselben Store für *alle* Sandboxes auf der Maschine.
+denselben Store für _alle_ Sandboxes auf der Maschine.
 
 Das Tückische daran ist nicht, dass ein `ln -sfn` dorthin scheitert. Es scheitert
-nämlich **nicht**. Es meldet Erfolg — und legt den Link *in* das eingehängte
+nämlich **nicht**. Es meldet Erfolg — und legt den Link _in_ das eingehängte
 Verzeichnis:
 
-```
+```bash
+
 $ ln -sfn /Users/du/.claude/skills ~/.claude/skills
 $ ls -la ~/.claude/skills/
 lrwxrwxrwx  skills -> /Users/du/.claude/skills     # gelandet IM Store
@@ -151,12 +152,12 @@ sbx skills import      # kopiert u.a. aus ~/.claude/skills
 
 Klingt einfacher. Drei Gründe, warum wir trotzdem mounten:
 
-| | `sbx skills import` | Unser `:ro`-Mount |
-|---|---|---|
-| Aktualität | **Kopie** — nach jeder Änderung neu importieren | live |
-| Schreibrechte | Store wird **read-write** gemountet | read-only |
-| Umfang | nur `skills` | skills, agents, commands, rules, plugins |
-| Stabilität | als **EXPERIMENTAL** markiert | stabile Flags |
+|               | `sbx skills import`                             | Unser `:ro`-Mount                        |
+| ------------- | ----------------------------------------------- | ---------------------------------------- |
+| Aktualität    | **Kopie** — nach jeder Änderung neu importieren | live                                     |
+| Schreibrechte | Store wird **read-write** gemountet             | read-only                                |
+| Umfang        | nur `skills`                                    | skills, agents, commands, rules, plugins |
+| Stabilität    | als **EXPERIMENTAL** markiert                   | stabile Flags                            |
 
 Besonders die zweite Zeile — und die ist nachgemessen, nicht vermutet:
 
@@ -182,7 +183,7 @@ Aber triff die Entscheidung bewusst, nicht aus Versehen.
 Das Schöne: Projektlokales funktioniert **von selbst**, weil es im gemounteten
 Projektordner liegt.
 
-```
+```bash
 mein-projekt/
 ├── .claude/
 │   ├── settings.json      # Hooks, Berechtigungen für DIESES Projekt
@@ -197,10 +198,10 @@ versioniert, im Team geteilt, und jeder bekommt dieselbe Umgebung.
 
 **Faustregel:**
 
-| | Wo |
-|---|---|
-| Brauche ich in jedem Projekt | global, `~/.claude/`, gemountet |
-| Gehört zu diesem einen Projekt | lokal, `.claude/` im Repo |
+|                                | Wo                              |
+| ------------------------------ | ------------------------------- |
+| Brauche ich in jedem Projekt   | global, `~/.claude/`, gemountet |
+| Gehört zu diesem einen Projekt | lokal, `.claude/` im Repo       |
 
 **Hooks** laufen übrigens **im Container**. Ein Hook, der ein Werkzeug aufruft,
 das nur auf deinem Mac existiert, schlägt in der Sandbox fehl. Halte
@@ -215,12 +216,12 @@ automatisch gefunden, ist versionierbar:
 
 ```json
 {
-  "mcpServers": {
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"]
-    }
-  }
+	"mcpServers": {
+		"context7": {
+			"command": "npx",
+			"args": ["-y", "@upstash/context7-mcp"]
+		}
+	}
 }
 ```
 
@@ -297,14 +298,14 @@ nicht projektlokal, sondern für alle Projekte der Sandbox.
 
 **Was du dafür aufgibst:**
 
-| | mit `SHARE_ALL=1` |
-|---|---|
-| Skill-Store | read-write und mit **allen** Sandboxes der Maschine geteilt |
-| Aktualität | Kopie — neue Skills und Plugins erst nach dem nächsten `up` |
-| Plugin-Aktivierung | pauschal alle installierten, nicht projektweise ausgewählt |
+|                    | mit `SHARE_ALL=1`                                           |
+| ------------------ | ----------------------------------------------------------- |
+| Skill-Store        | read-write und mit **allen** Sandboxes der Maschine geteilt |
+| Aktualität         | Kopie — neue Skills und Plugins erst nach dem nächsten `up` |
+| Plugin-Aktivierung | pauschal alle installierten, nicht projektweise ausgewählt  |
 
 **Was bleibt:** Die `settings.json` des Hosts wird weiterhin nicht gemountet. Die
-Datei in der Sandbox wird *erzeugt* und enthält nur `enabledPlugins` — die
+Datei in der Sandbox wird _erzeugt_ und enthält nur `enabledPlugins` — die
 Host-Berechtigungen bleiben auf dem Host. Diese eine Trennung geben wir auch im
 Bequemlichkeitsmodus nicht auf, weil sie nichts kostet.
 
@@ -333,16 +334,16 @@ cache  data  installed_plugins.json  known_marketplaces.json  marketplaces
 
 Die Registrierung (`installed_plugins.json`) kommt also mit.
 
-Was **nicht** mitkommt, ist die *Aktivierung*: welche Plugins eingeschaltet sind,
+Was **nicht** mitkommt, ist die _Aktivierung_: welche Plugins eingeschaltet sind,
 steht in `settings.json` — und die mounten wir bewusst nicht (siehe oben). Willst
 du ein gemountetes Plugin in der Sandbox nutzen, aktiviere es projektlokal:
 
 ```json
 // <projekt>/.claude/settings.json
 {
-  "enabledPlugins": {
-    "mattpocock-skills@claude-plugins-official": true
-  }
+	"enabledPlugins": {
+		"mattpocock-skills@claude-plugins-official": true
+	}
 }
 ```
 

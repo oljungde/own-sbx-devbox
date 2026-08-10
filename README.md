@@ -58,6 +58,34 @@ rewrites paths to `/c/Users/...`, which surprises `sbx create` mount arguments.
 See [`docs/tutorial/`](docs/tutorial/) for the full walkthrough and
 [`docs/cheatsheet.md`](docs/cheatsheet.md) for every command on one page.
 
+## Two variants
+
+This repository ships **two** takes on the same idea. They share nothing but the
+`sbx` concepts underneath, and they can run side by side on one machine.
+
+|                        | `devbox/` (variant 1)          | `solobox/` (variant 2)              |
+| ---------------------- | ------------------------------ | ----------------------------------- |
+| Sandboxes              | one per profile                | exactly one, machine-wide           |
+| Invocation             | `./devbox/devbox.sh up privat` | `solobox up`, from inside a project |
+| Config file            | required                       | optional                            |
+| Global skills / agents | opt-in per profile             | always on                           |
+| Global hooks & plugins | only via `SHARE_ALL`           | always on, filtered                 |
+| Claude starts in       | the primary workspace          | your current project directory      |
+
+Variant 2 exists for the case where you want your entire global Claude setup —
+skills, agents, commands, rules, hooks, plugins — available in every project
+without copying it anywhere, and you are willing to trade the isolation that
+separate profiles give you. Its tutorial is
+[`docs/tutorial-solo/`](docs/tutorial-solo/), its command reference
+[`docs/cheatsheet-solo.md`](docs/cheatsheet-solo.md).
+
+```bash
+chmod +x solobox/solobox.sh
+./solobox/solobox.sh install     # symlink into ~/.local/bin
+cd ~/dev/own/some-project
+solobox up                       # builds, creates the sandbox, starts Claude here
+```
+
 ## How it fits together
 
 ```bash

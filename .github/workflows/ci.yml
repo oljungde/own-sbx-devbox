@@ -37,13 +37,23 @@ jobs:
 
       # shellcheck ist auf den ubuntu-Runnern vorinstalliert.
       - name: Shell-Skripte prüfen
-        run: shellcheck devbox/devbox.sh scripts/check-links.sh
+        run: shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
 
       # Die Profilvorlage wird von devbox.sh per `source` gelesen. Ein
       # Syntaxfehler darin würde also erst beim Start auffallen — und dort wie
-      # ein Fehler des Wrappers aussehen.
-      - name: Profilvorlage ist gültiges Bash
-        run: bash -n devbox/devbox.conf.example
+      # ein Fehler des Wrappers aussehen. Für solobox.conf.example gilt das
+      # genauso — dort sogar mit dem Zusatz, dass die Datei optional ist und ein
+      # Fehler darin deshalb noch später auffiele.
+      - name: Konfigurationsvorlagen sind gültiges Bash
+        run: |
+          bash -n devbox/devbox.conf.example
+          bash -n solobox/solobox.conf.example
+
+      # Beide Wrapper werden über einen Symlink bzw. direkt aufgerufen — ohne
+      # Ausführbar-Bit scheitert das mit "permission denied", und zwar erst beim
+      # Nutzer.
+      - name: Wrapper sind ausführbar
+        run: test -x devbox/devbox.sh && test -x solobox/solobox.sh
 
       - name: Links in der Doku prüfen
         run: ./scripts/check-links.sh

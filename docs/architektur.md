@@ -99,8 +99,22 @@ werden aber nicht automatisch als User-Skills gefunden. Wer einen davon braucht,
 legt ihn projektlokal unter `.claude/skills/` ab — womit er nebenbei versioniert
 und im Team geteilt ist.
 
-Ein `--no-share-skills`-Flag erwähnt zwar `sbx skills --help`, es existiert in
-v0.38.0 aber weder bei `sbx create` noch bei `sbx run`.
+Ein `--no-share-skills`-Flag erwähnt `sbx skills --help`. In `sbx create --help`
+und `sbx run --help` taucht es **nicht** auf — angenommen wird es von beiden
+trotzdem. Nachgemessen in v0.38.0 über die Fehlermeldung, die zurückkommt:
+
+```
+$ sbx create --no-share-skills claude
+ERROR: requires at least 1 argument: PATH      # Flag akzeptiert, Pfad fehlt
+
+$ sbx create --share-skills claude
+ERROR: unknown flag: --share-skills            # Gegenprobe: so sieht Ablehnung aus
+```
+
+Es ist also ein verstecktes Flag, das zum EXPERIMENTAL-Kommando `sbx skills`
+gehört. Für `devbox` bleibt es damit außen vor — die Regel „nur stabile Flags im
+kritischen Pfad" gilt erst recht für eines, das nicht einmal in der Hilfe steht.
+`solobox` benutzt es hinter einem Schalter, siehe unten.
 
 ### Die Ausnahme: `SHARE_ALL`
 
@@ -220,6 +234,155 @@ festgelegt war 10.11.0, im Container kam 11.21.0 an — mit Download zur Laufzei
 
 `npm install -g pnpm@10.11.0` landet in `/usr/local/share/npm-global` und ist
 für alle User sichtbar und fest.
+
+---
+
+## Variante 2: solobox — genau eine Sandbox
+
+`solobox` beantwortet dieselbe Frage anders. Nicht besser, anders. Der Handel:
+**Bequemlichkeit gegen Trennung.**
+
+### Warum überhaupt eine zweite Variante
+
+devbox trennt über Profile. Das ist sauber, kostet aber bei jedem neuen Vorhaben
+eine Entscheidung, einen Eintrag und einen eigenen Login. Wer auf einer Maschine
+ohnehin nur mit sich selbst arbeitet, zahlt diesen Preis ohne Gegenwert.
+
+solobox dreht die Voreinstellung um: eine Sandbox, ein Login, und alles Globale
+aus `~/.claude` ist immer dabei — inklusive Hooks und Plugins, die devbox selbst
+im `SHARE_ALL`-Modus nicht anfasst.
+
+### Die zentrale Mechanik: `sbx exec -w`
+
+Eine Sandbox für alle Projekte hat ein Problem, das devbox nicht hat: `sbx run`
+startet den Agenten im **Primary Workspace**. Claude Code liest die
+projektlokale Konfiguration aber beim **Start** aus dem Arbeitsverzeichnis — ein
+`cd` in der laufenden Sitzung holt sie nicht nach. Eine Sandbox mit
+Dach-Ordner-Mount würde also *immer* ohne Projektkontext starten.
+
+Die Lösung hängt an einer Eigenschaft, die devbox nur nebenbei nutzt: zusätzliche
+Workspaces werden unter ihrem **absoluten Host-Pfad** eingehängt. Host-Pfad und
+Sandbox-Pfad sind identisch, und damit stimmt:
+
+```bash
+cd ~/dev/own/projekt
+sbx exec -it -w "$PWD" solobox claude
+```
+
+Das ist der eigentliche Unterschied der Variante — kein Bild, kein Flag, ein
+Arbeitsverzeichnis.
+
+Der Preis: `sbx exec` ist nicht der von `sbx` vorgesehene Weg, einen Agenten zu
+starten (`sbx run` ist es). Deshalb steht der Vergleich beider Startarten als
+ausdrücklicher Prüfschritt im
+[Tutorial-Kapitel 1](tutorial-solo/01-die-eine-sandbox.md), und der erste Start
+nach dem Anlegen läuft über `sbx run` — dort passiert der Login.
+
+### `settings.json`: ableiten statt mounten
+
+devbox lässt die Host-`settings.json` komplett draußen und erzeugt im
+`SHARE_ALL`-Modus eine mit *nur* `enabledPlugins`. solobox braucht mehr, weil es
+auch Hooks mitbringen soll — nimmt aber weiterhin nicht die Datei selbst,
+sondern leitet ab:
+
+| Übernommen | Warum |
+|---|---|
+| `enabledPlugins`, `extraKnownMarketplaces` | gehören zusammen, sonst findet die Sandbox den Marktplatz nicht |
+| `model`, `effortLevel` | reine Vorlieben, host-unabhängig |
+| `hooks` abzüglich `HOOK_SKIP` | siehe unten |
+
+| Gesetzt statt kopiert | Warum |
+|---|---|
+| `permissions.defaultMode` (Standard `acceptEdits`, per `PERMISSION_MODE` umstellbar) | in der Sandbox darf Claude Dateien ohne Rückfrage ändern — aber **nicht** `bypassPermissions`, weil `~/dev` echt eingehängt und beschreibbar ist. Die Sandbox schützt den Host, nicht die Projekte. |
+
+Dazu ein Detail, das man nur beim Hineinsehen findet: Das Image hinterlässt
+seinen Modus auf der **obersten** Ebene der `settings.json`
+(`"defaultMode": "bypassPermissions"` plus `"bypassPermissionsModeAccepted"`),
+während der dokumentierte Schlüssel `permissions.defaultMode` heißt. Setzt man
+nur letzteren, behauptet die Datei zweierlei — und welche Angabe gewinnt, ist
+nicht dokumentiert. solobox entfernt deshalb die Schlüssel des Images, sobald
+ein anderer Modus gewünscht ist, und setzt bei `bypassPermissions` beide Ebenen
+gleichlautend. Nicht die elegantere Lösung, aber die einzige, die eine eindeutige
+Datei hinterlässt.
+
+Nicht prüfbar per `claude --print`: der Kopfmodus setzt Berechtigungen nicht
+durch (ein Bash-Aufruf läuft dort selbst mit `--permission-mode default`).
+
+### Wo die Bremse wirklich sitzt
+
+Die Suche nach der Rückfrage bei einem Bash-Aufruf führte durch drei Schichten,
+und die Antwort liegt in keiner davon, wo man sie vermutet:
+
+1. **`sbx run` startet den Agenten mit `--dangerously-skip-permissions`** (mit
+   `ps` in der Sandbox nachgemessen). In dieser Sitzung ist die `settings.json`
+   gegenstandslos. Betrifft bei solobox nur den ersten Start nach dem Anlegen —
+   danach läuft alles über `sbx exec … claude`, ohne Flag.
+2. **Claude Code betreibt in der Sandbox seinen eigenen Bash-Sandkasten** und
+   lässt darin laufende Befehle ohne Rückfrage zu (`autoAllowBashIfSandboxed`).
+   Deshalb fragt auch eine Sitzung ohne Flag bei `date` nicht nach.
+3. **Die wirksame Grenze ist das Arbeitsverzeichnis.** Nachgemessen aus einer in
+   `~/dev/own` gestarteten Sitzung: `touch ~/dev/own/PROBE` gelingt,
+   `touch /home/agent/PROBE` wird abgewiesen mit „Schreibzugriff außerhalb des
+   erlaubten Arbeitsverzeichnisses blockiert".
+
+Daraus folgt die eigentliche Rechtfertigung für `sbx exec -w "$PWD"`: Sie ist
+nicht nur der Weg, projektlokale Konfiguration zu laden, sondern **auch die
+Sicherheitsgrenze**. Wer im Projekt startet, dessen Agent kann nur in diesem
+Projekt schreiben; wer in `~/dev` startet, gibt ihm alle Projekte.
+
+`PERMISSION_MODE` bleibt trotzdem sinnvoll — für alles, was der innere
+Sandkasten nicht abdeckt, und als Schalter zurück auf `bypassPermissions`. Wer
+Rückfragen auch für sandkastenfähige Befehle will, nimmt
+`"sandbox": {"autoAllowBashIfSandboxed": false}` in die abgeleitete Datei auf.
+Bewusst nicht voreingestellt: eine Rückfrage pro `ls` ist Reibung ohne
+Gegenwert, solange der Radius ohnehin das Projekt ist.
+
+| Draußen | Warum |
+|---|---|
+| `permissions.allow/deny`, `sandbox` | Pfade und Regeln des Hosts, im Container bestenfalls wirkungslos |
+| `theme`, `voice`, `tui` | gerätespezifisch |
+
+### Hooks sind nicht portabel
+
+Der Grund für `HOOK_SKIP`: Ein Hook, der `osascript` oder `terminal-notifier`
+aufruft, kann im Container nicht funktionieren — und weil solche Skripte
+üblicherweise mit `set -e` laufen, endet der Hook nicht still, sondern mit einem
+Fehler bei **jeder** Antwort. Ein Hook dagegen, der nur `jq` und die
+Hook-Eingabe benutzt (etwa ein `.env`-Blocker), läuft überall.
+
+Deshalb steht `jq` im Dockerfile und `HOOK_SKIP=(Notification Stop)` in den
+Voreinstellungen. Es ist eine Liste, keine Heuristik: raten, welcher Hook
+portabel ist, geht schief.
+
+### `ISOLATE_SKILLS`: die eine Flag-Ausnahme
+
+Skills lassen sich nicht verlinken (siehe [oben](#der-sonderfall-skills)), also
+kopiert solobox sie — und landet damit im geteilten Store. Für den Fall, dass
+das nicht gewollt ist, gibt es `--no-share-skills`. Drei Entscheidungen dazu:
+
+- **Standard ist der stabile Weg**, nicht der bequeme: ohne Flag, mit Kopie in
+  den geteilten Store. Ein undokumentiertes Flag gehört nicht in den Pfad, den
+  jeder Lernende geht.
+- **Der Schalter prüft, bevor er handelt.** `supports_no_share_skills()` fragt
+  `sbx create` ohne Pfad an: kommt „requires at least 1 argument", ist das Flag
+  bekannt; kommt „unknown flag", nicht. So lässt sich ein verstecktes Flag
+  testen, ohne etwas anzulegen.
+- **Fällt das Flag weg, bricht nichts.** Der Wrapper fragt dann nach, statt
+  abzubrechen oder stillschweigend in den geteilten Store zu schreiben.
+
+### Was solobox aufgibt
+
+| Aufgegeben | Konsequenz |
+|---|---|
+| Trennung privat/beruflich | eine Sandbox sieht alles unter der Wurzel |
+| Getrennte Netzregeln | eine Liste für alles |
+| Getrennter Laufzeitzustand | globale npm-Pakete teilen sich eine Sandbox |
+| Wahlfreiheit beim zweiten Mal | `ROOTS` steht nach dem Anlegen fest |
+| Trennung zum Skill-Store | Standard ist geteilt (umschaltbar) |
+
+Was **nicht** aufgegeben wird, weil es nichts kostet: `.credentials.json` bleibt
+draußen, `settings.json` wird nicht gemountet, Netzregeln bleiben
+`--sandbox`-scoped, und `~/.claude` ist ausschließlich `:ro` eingehängt.
 
 ---
 
