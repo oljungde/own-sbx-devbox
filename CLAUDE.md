@@ -6,7 +6,7 @@ Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
 ## Wichtig beim Arbeiten an diesem Repo
 
 - **Kommentare auf Deutsch.** Sie sind Lehrmaterial, nicht Beiwerk. Erkläre das
-  *Warum*, nicht das *Was*. Die `README.md` ist die einzige englische Datei.
+  _Warum_, nicht das _Was_. Die `README.md` ist die einzige englische Datei.
 - **Nur stabile `sbx`-Flags** in `devbox/devbox.sh`. `sbx kit` und `sbx skills`
   sind EXPERIMENTAL und gehören nicht in den kritischen Pfad — die Kit-Variante
   liegt bewusst separat unter `devbox/kit/`.
@@ -19,21 +19,50 @@ Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
 
 ## Aufbau
 
-| Pfad | Inhalt |
-|---|---|
-| `devbox/Dockerfile` | Toolchain des Images |
-| `devbox/devbox.sh` | Wrapper um `sbx` (der Hauptweg) |
-| `devbox/devbox.conf.example` | Profilvorlage |
-| `devbox/kit/kit.yaml` | deklarative Variante (Kür) |
-| `docs/tutorial/` | siebenteiliges Tutorial |
-| `docs/architektur.md` | die Begründungen |
-| `docs/troubleshooting.md` | Fehlersuche |
+| Pfad                         | Inhalt                                          |
+| ---------------------------- | ----------------------------------------------- |
+| `devbox/Dockerfile`          | Toolchain des Images                            |
+| `devbox/devbox.sh`           | Wrapper um `sbx` (der Hauptweg)                 |
+| `devbox/devbox.conf.example` | Profilvorlage                                   |
+| `devbox/kit/kit.yaml`        | deklarative Variante (Kür)                      |
+| `docs/tutorial/`             | Tutorial: Kapitel 0 (Setup) plus sieben Kapitel |
+| `docs/cheatsheet.md`         | alle Kommandos auf einer Seite                  |
+| `docs/architektur.md`        | die Begründungen                                |
+| `docs/troubleshooting.md`    | Fehlersuche                                     |
+| `scripts/check-links.sh`     | prüft relative Links in der Doku                |
+| `.github/workflows/ci.yml`   | shellcheck + Linkprüfung                        |
+
+## Vor dem Commit
+
+Genau das, was die CI prüft:
+
+```bash
+shellcheck devbox/devbox.sh scripts/check-links.sh
+bash -n devbox/devbox.conf.example
+./scripts/check-links.sh
+```
+
+Kein `shellcheck` zur Hand:
+`docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable /mnt/devbox/devbox.sh`
 
 ## Nach Änderungen am Dockerfile
 
 ```bash
-./devbox/devbox.sh build --force
+./devbox/devbox.sh update
 docker run --rm devbox/base:latest bash -lc 'python --version; pnpm --version'
 ```
 
 `pnpm --version` darf **keine** Corepack-Download-Meldung zeigen.
+
+`update` statt `build --force`: Es sagt zusätzlich, welche bestehenden Sandboxes
+das neue Template noch nicht haben — die erreicht ein Neubau nämlich nicht.
+
+## Fallen in `devbox.sh`
+
+- **`set -euo pipefail` + `sbx`.** `sbx template ls` endet mit Exitcode 1, wenn
+  man nicht bei Docker angemeldet ist. Jede Pipeline mit `sbx` in einer
+  Zuweisung braucht deshalb ein `|| true`, sonst bricht das Skript stumm ab.
+- **Keine Here-Docs für Schleifen.** Sie brauchen eine Temp-Datei, die in einer
+  Sandbox nicht überall schreibbar ist. Prozess-Substitution
+  (`done < <(...)`) statt Pipe — eine Pipe würde die Schleife in eine Subshell
+  stecken und Zähler verlieren.

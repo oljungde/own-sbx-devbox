@@ -38,12 +38,29 @@ $EDITOR ~/.config/devbox/devbox.conf     # point WORKSPACES at your project root
 ./devbox/devbox.sh up privat             # creates the sandbox and starts Claude
 ```
 
-Requires `sbx`, Docker and `gh` on the host. See
-[`docs/tutorial/`](docs/tutorial/) for the full walkthrough.
+Requires `sbx` and a **local** Docker daemon on the host — `sbx` alone does not
+need Docker Desktop, but devbox builds its own image with `docker build`, so it
+does. See [`docs/tutorial/00-vorbereitung.md`](docs/tutorial/00-vorbereitung.md)
+for installation on macOS, Linux and Windows.
+
+## Platform support
+
+|             | Supported                               | Not supported                                |
+| ----------- | --------------------------------------- | -------------------------------------------- |
+| **macOS**   | 14 (Sonoma) or later, Apple silicon     | Intel Macs                                   |
+| **Windows** | 11 on x86_64, via **WSL2**              | Windows 10, Windows on ARM, PowerShell alone |
+| **Linux**   | Ubuntu 24.04 or later, x86_64 / aarch64 | older Ubuntu, hosts without KVM              |
+
+`devbox.sh` is a bash script, so on Windows run it inside WSL2 — and keep the
+repository in the WSL filesystem, not under `/mnt/c/`. Git Bash mostly works but
+rewrites paths to `/c/Users/...`, which surprises `sbx create` mount arguments.
+
+See [`docs/tutorial/`](docs/tutorial/) for the full walkthrough and
+[`docs/cheatsheet.md`](docs/cheatsheet.md) for every command on one page.
 
 ## How it fits together
 
-```
+```bash
 Dockerfile  --docker build-->  image  --sbx template load-->  template
                                                                  |
                                                           sbx create -t

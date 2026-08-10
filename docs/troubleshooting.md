@@ -4,9 +4,28 @@ Die Probleme in der Reihenfolge, in der sie erfahrungsgemäß auftreten.
 
 ---
 
+## Windows: `./devbox/devbox.sh` wird nicht erkannt
+
+```bash
+./devbox/devbox.sh : The term './devbox/devbox.sh' is not recognized as the name
+of a cmdlet, function, script file, or operable program.
+```
+
+`devbox.sh` ist ein Bash-Skript, PowerShell kann es nicht ausführen. Nutze
+**WSL2** — Einrichtung in [Kapitel 0](tutorial/00-vorbereitung.md#windows).
+
+Läuft es in WSL, ist aber quälend langsam: Liegt das Repo unter `/mnt/c/...`?
+Dann in das WSL-Dateisystem verschieben (`~/dev/own/devbox`). Der Zugriff über
+die Windows-Grenze ist um Größenordnungen langsamer.
+
+Antwortet `docker` in WSL nicht, fehlt in Docker Desktop die WSL-Integration:
+_Settings → Resources → WSL integration_ für die Distribution einschalten.
+
+---
+
 ## `sbx` meldet „Not authenticated to Docker"
 
-```
+```bash
 ERROR: Not authenticated to Docker
 Sign in with: sbx login
 ```
@@ -21,6 +40,11 @@ liegt es **nicht** an der Anmeldung, sondern daran, dass der Prozess nicht auf
 das Zustandsverzeichnis von `sbx` zugreifen darf. Das passiert zum Beispiel,
 wenn `sbx` selbst aus einer eingeschränkten Umgebung heraus aufgerufen wird.
 Führe die `sbx`-Befehle dann direkt in einem normalen Terminal aus.
+
+**Wie sich das im Wrapper zeigt:** `./devbox.sh status` meldet dann
+_„kein Template im sbx-Store"_. Das ist dieselbe Ursache — ohne Anmeldung kann
+`sbx template ls` den Store nicht lesen, und von außen sieht „nicht angemeldet"
+genauso aus wie „nichts gebaut".
 
 ---
 
@@ -66,7 +90,7 @@ Damit das nicht wieder passiert: einen **Dach-Ordner** mounten.
 
 ## pnpm lädt beim ersten Aufruf eine andere Version nach
 
-```
+```bash
 $ pnpm --version
 ! Corepack is about to download .../pnpm-11.21.0.tgz
 11.21.0
@@ -170,7 +194,7 @@ dann hilft nur `rm` + `up`.
 
 Das ist so gewollt. `sbx` hängt an `/home/agent/.claude/skills` seinen **eigenen**
 Skill-Store ein — denselben für alle Sandboxes der Maschine. Ein Symlink dorthin
-schlägt nicht fehl, sondern landet still *im* Store und wäre damit in jeder
+schlägt nicht fehl, sondern landet still _im_ Store und wäre damit in jeder
 anderen Sandbox sichtbar. Deshalb überspringt der Wrapper `skills` bewusst
 (Details in [architektur.md](architektur.md#der-sonderfall-skills)).
 
@@ -196,16 +220,16 @@ sbx skills import
 ## Plugins werden nicht geladen, obwohl der Ordner da ist
 
 Der Ordner bringt die Registrierung mit (`installed_plugins.json`), aber nicht
-die *Aktivierung* — die steht in `settings.json`, die wir bewusst nicht mounten.
+die _Aktivierung_ — die steht in `settings.json`, die wir bewusst nicht mounten.
 
 Aktiviere das Plugin projektlokal:
 
 ```json
 // <projekt>/.claude/settings.json
 {
-  "enabledPlugins": {
-    "mattpocock-skills@claude-plugins-official": true
-  }
+	"enabledPlugins": {
+		"mattpocock-skills@claude-plugins-official": true
+	}
 }
 ```
 
@@ -222,6 +246,27 @@ Fehlende Bibliothek ermitteln und in Schritt 1 des Dockerfiles ergänzen:
 ```bash
 sbx exec -it devbox-privat bash -c 'ldd /ms-playwright/chromium-*/chrome-linux/chrome | grep "not found"'
 ```
+
+---
+
+## Ein neues Werkzeug fehlt, obwohl das Image neu gebaut ist
+
+Du hast das Dockerfile ergänzt, `build` lief durch — und in der Sandbox ist das
+Werkzeug trotzdem nicht da.
+
+Erwartet. Eine Sandbox wird beim **Anlegen** aus dem Template kopiert und danach
+nie wieder daran angeglichen. Ein neues Template erreicht sie nicht.
+
+```bash
+./devbox/devbox.sh update        # baut neu und nennt die veralteten Sandboxes
+./devbox/devbox.sh rm privat     # nur für die betroffene
+./devbox/devbox.sh up privat     # holt das neue Template
+```
+
+Der Preis dafür steht im nächsten Abschnitt. Wer ihn vermeiden will, installiert
+das Werkzeug einmalig direkt in der laufenden Sandbox
+(`./devbox.sh shell privat`) — das überlebt aber kein `rm`, ist also die
+Notlösung, nicht der Weg.
 
 ---
 
@@ -246,7 +291,7 @@ Das Image belegt rund 5,9 GB, die tar-Datei beim Übertragen etwa 1,4 GB
 (`docker save` komprimiert).
 
 - `./devbox.sh build` überspringt den Vorgang, solange sich das Dockerfile nicht
-  geändert hat.
+  geändert hat. `./devbox.sh update` baut dagegen immer (`--force`).
 - Aufräumen: `docker image prune` und alte `devbox/base`-Versionen entfernen.
 - Wer Playwright nicht braucht: Schritt 7 aus dem Dockerfile entfernen, das
   spart mehrere GB.

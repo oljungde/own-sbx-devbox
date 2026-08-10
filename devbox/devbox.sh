@@ -91,6 +91,7 @@ load_profile() {
   # Vor dem Laden zurücksetzen, damit ein unvollständiges Profil auffällt statt
   # heimlich Werte eines anderen zu erben.
   NAME=""; WORKSPACES=(); EXTRA_HOSTS=()
+  # shellcheck disable=SC2034  # wird nicht hier, sondern in der Profildatei gelesen
   DEVBOX_PROFILE="$profile"
   # shellcheck disable=SC1090
   source "$CONFIG_FILE"
@@ -112,6 +113,40 @@ sandbox_exists() { sbx ls -q 2>/dev/null | grep -qx "$SANDBOX"; }
 hash_file()     { printf '%s\n' "$STATE_DIR/image.hash"; }
 recorded_hash() { cat "$(hash_file)" 2>/dev/null || true; }
 current_hash()  { shasum -a 256 "$DOCKERFILE" | cut -d' ' -f1; }
+
+# Die ID des Templates, das derzeit im sbx-Store liegt — oder leer, wenn keins
+# geladen ist. `sbx template load` stellt dem Namen "docker.io/" voran, aus
+# "devbox/base:latest" wird dort also "docker.io/devbox/base" + Tag "latest".
+#
+# Warum die Tabelle parsen und nicht `--json`? Weil `jq` auf dem Host nicht
+# vorausgesetzt werden soll. awk ist überall da.
+#
+# Das `|| true` am Ende ist nicht Bequemlichkeit, sondern Notwendigkeit:
+# `sbx template ls` endet mit Exitcode 1, solange man nicht bei Docker
+# angemeldet ist ("ERROR: Not authenticated to Docker"). Wegen `pipefail` würde
+# dieser Status in die Zuweisung wandern und wegen `set -e` das ganze Skript
+# beenden — und zwar stumm. Eine leere Antwort ist hier die richtige Antwort;
+# die Aufrufer behandeln sie.
+template_id() {
+  local repo="docker.io/${IMAGE%:*}" tag="${IMAGE##*:}"
+  sbx template ls 2>/dev/null \
+    | awk -v r="$repo" -v t="$tag" '$1==r && $2==t { print $3; exit }' || true
+}
+
+# Merkzettel: mit WELCHER Template-ID wurde eine Sandbox angelegt?
+#
+# Das muss der Wrapper selbst mitschreiben — `sbx ls` verrät es nicht. Und
+# wissen müssen wir es, weil ein neu gebautes Template eine BESTEHENDE Sandbox
+# nicht erreicht: Container werden beim Anlegen aus dem Template kopiert, nicht
+# laufend daran angeglichen. Ohne diesen Zettel wäre `update` blind.
+sandbox_image_file() { printf '%s\n' "$STATE_DIR/sandbox-$1.image"; }
+recorded_sandbox_image() { cat "$(sandbox_image_file "$1")" 2>/dev/null || true; }
+
+# Die Namen UNSERER Sandboxes, eine pro Zeile. Das Präfix ist die Grenze: alles
+# ohne "devbox-" gehört einem anderen Setup auf dieser Maschine und wird von
+# diesem Skript nie angefasst.
+# `|| true` aus demselben Grund wie bei template_id.
+devbox_sandboxes() { sbx ls -q 2>/dev/null | grep '^devbox-' || true; }
 
 # --- build: Image bauen und als sbx-Template registrieren --------------------
 #
@@ -176,6 +211,11 @@ cmd_up() {
     sbx create -t "$IMAGE" --name "$SANDBOX" claude \
       "${WORKSPACES[@]}" \
       "${shared_mounts[@]}"
+
+    # Festhalten, aus welchem Template diese Sandbox entstanden ist. Genau
+    # daran erkennt `status` und `update` später, ob sie veraltet ist.
+    mkdir -p "$STATE_DIR"
+    template_id > "$(sandbox_image_file "$SANDBOX")"
   else
     info "Sandbox '$SANDBOX' existiert bereits — hänge mich dran."
   fi
@@ -259,9 +299,134 @@ cmd_rm() {
   warn "Deine Projektdateien liegen auf dem Host und sind NICHT betroffen."
   read -r -p "Sandbox '$SANDBOX' wirklich entfernen? [j/N] " answer
   case "$answer" in
-    [jJyY]) sbx rm --force "$SANDBOX"; info "entfernt." ;;
-    *)      info "abgebrochen." ;;
+    [jJyY])
+      sbx rm --force "$SANDBOX"
+      # Den Merkzettel mitnehmen — sonst behauptet `status` später, eine längst
+      # entfernte Sandbox sitze auf einem veralteten Template.
+      rm -f "$(sandbox_image_file "$SANDBOX")"
+      info "entfernt."
+      ;;
+    *) info "abgebrochen." ;;
   esac
+}
+
+# --- status: Wer läuft, auf welchem Template, mit welchen Regeln? ------------
+#
+# Abgrenzung zu `doctor`: doctor fragt "ist mein HOST richtig eingerichtet?",
+# status fragt "was läuft gerade?". Deshalb braucht status auch `sbx`, doctor
+# nicht.
+cmd_status() {
+  local id
+  id="$(template_id)"
+
+  echo "--- Template ---"
+  if [ -n "$id" ]; then
+    printf '  ✓ %s  (ID %s)\n' "$IMAGE" "$id"
+    if [ "$(current_hash)" = "$(recorded_hash)" ]; then
+      echo "    Dockerfile unverändert seit dem letzten Bau"
+    else
+      echo "    ! Dockerfile hat sich geändert — './devbox.sh update'"
+    fi
+  else
+    echo "  ✗ kein Template '$IMAGE' im sbx-Store"
+    echo "    Entweder noch nicht gebaut ('./devbox.sh build') — oder du bist"
+    echo "    nicht angemeldet ('sbx login'). Beides sieht von hier gleich aus."
+  fi
+
+  echo "--- Unsere Sandboxes (Präfix 'devbox-') ---"
+  local eigene=0 fremde=0 name zustand vermerk
+  # Warum die Ausgabe von `sbx ls` und nicht `sbx ls -q`? Weil wir den Zustand
+  # (running/stopped) mitlesen wollen. Spalten: NAME AGENT STATUS [PORTS] ...
+  # PORTS ist meist leer, deshalb greifen wir nur auf $1 und $3 zu.
+  while read -r name zustand; do
+    [ -n "$name" ] || continue
+    eigene=$((eigene + 1))
+
+    vermerk="$(recorded_sandbox_image "$name")"
+    if [ -z "$vermerk" ]; then
+      vermerk="Template unbekannt (vor dieser devbox-Version angelegt?)"
+    elif [ "$vermerk" = "$id" ]; then
+      vermerk="Template aktuell"
+    else
+      vermerk="Template VERALTET ($vermerk) — 'update' erklärt, was zu tun ist"
+    fi
+
+    printf '  %-22s %-9s %s\n' "$name" "$zustand" "$vermerk"
+    # Prozess-Substitution, KEINE Pipe. Eine Pipe würde die Schleife in eine
+    # Subshell stecken, und $eigene wäre danach wieder 0. Ein Here-Doc ginge
+    # auch, braucht aber eine Temp-Datei — und die ist in einer Sandbox nicht
+    # überall schreibbar.
+  done < <(sbx ls 2>/dev/null | awk 'NR > 1 && $1 ~ /^devbox-/ { print $1, $3 }' || true)
+  [ "$eigene" -gt 0 ] || echo "  (keine — './devbox.sh up <profil>')"
+
+  # Der Blick auf die Nachbarn ist kein Selbstzweck: Er macht sichtbar, warum
+  # jede Netzregel in diesem Skript --sandbox-scoped ist. Diese Sandboxes
+  # gehören jemand anderem, und eine globale Regel würde sie mitverändern.
+  fremde="$(sbx ls 2>/dev/null | awk 'NR > 1 && $1 !~ /^devbox-/' | wc -l | tr -d ' ' || true)"
+  echo "--- Andere Sandboxes auf dieser Maschine ---"
+  if [ "$fremde" -gt 0 ]; then
+    printf '  %s — von unseren Regeln unberührt (alle sind --sandbox-scoped)\n' "$fremde"
+  else
+    echo "  keine"
+  fi
+
+  echo
+  echo "Netzregeln einer Sandbox ansehen: sbx policy ls devbox-<name>"
+}
+
+# --- update: neues Template bauen und sagen, wen es noch nicht erreicht ------
+#
+# Der Fallstrick, den dieses Kommando sichtbar macht: `build` erzeugt ein neues
+# Template, aber eine bereits bestehende Sandbox merkt davon NICHTS. Sie wurde
+# beim Anlegen aus dem alten Template kopiert und bleibt darauf. Wer das nicht
+# weiß, ändert das Dockerfile, baut neu — und sucht anschließend lange, warum
+# das neue Werkzeug in der Sandbox fehlt.
+cmd_update() {
+  cmd_build --force
+
+  local aktuell veraltet=0 gesamt=0 name vermerk
+  aktuell="$(template_id)"
+
+  echo
+  # Ohne bekannte Ziel-ID wäre jeder Vergleich unten geraten — dann lieber
+  # nichts behaupten.
+  if [ -z "$aktuell" ]; then
+    warn "Template-ID nicht lesbar — überspringe den Abgleich."
+    warn "Prüfe 'sbx login' und danach './devbox.sh status'."
+    return 0
+  fi
+
+  info "prüfe, welche Sandboxes noch auf einem älteren Template sitzen ..."
+  while read -r name; do
+    [ -n "$name" ] || continue
+    gesamt=$((gesamt + 1))
+    vermerk="$(recorded_sandbox_image "$name")"
+    if [ -z "$vermerk" ]; then
+      warn "  $name — unbekannt, aus welchem Template angelegt"
+      veraltet=$((veraltet + 1))
+    elif [ "$vermerk" != "$aktuell" ]; then
+      warn "  $name — noch auf $vermerk (neu ist $aktuell)"
+      veraltet=$((veraltet + 1))
+    else
+      info "  $name — aktuell"
+    fi
+  done < <(devbox_sandboxes)
+
+  if [ "$gesamt" -eq 0 ]; then
+    info "Keine Sandbox vorhanden — das neue Template wird beim nächsten"
+    info "'./devbox.sh up <profil>' verwendet."
+  elif [ "$veraltet" -gt 0 ]; then
+    echo
+    warn "Ein neues Template erreicht eine bestehende Sandbox NICHT. Damit sie es"
+    warn "bekommt, muss sie einmal neu angelegt werden:"
+    warn ""
+    warn "    ./devbox.sh rm <profil> && ./devbox.sh up <profil>"
+    warn ""
+    warn "Das kostet den Claude-Login und zur Laufzeit installierte Pakete."
+    warn "Deine Projektdateien liegen auf dem Host und bleiben unberührt."
+  else
+    info "Alle unsere Sandboxes sind auf dem neuen Template."
+  fi
 }
 
 cmd_doctor() {
@@ -301,30 +466,38 @@ cmd_doctor() {
   return "$ok"
 }
 
+# Bewusst `printf` statt `cat <<EOF`: Ein Here-Doc legt die Zeilen erst in eine
+# temporäre Datei. In einer eingeschränkten Umgebung — etwa wenn du devbox von
+# INNERHALB einer Sandbox aufrufst — ist das Temp-Verzeichnis nicht schreibbar,
+# und dann scheitert schon die Hilfe. printf braucht keine Datei.
 usage() {
-  cat <<'EOF'
-devbox — eine Claude-Sandbox für mehrere Projekte
-
-Aufruf: ./devbox.sh <kommando> [profil]
-
-  build [--force]   Image bauen und als sbx-Template registrieren.
-                    Übersprungen, solange sich das Dockerfile nicht geändert hat.
-
-  up [profil]       Sandbox anlegen (beim ersten Mal) und Claude darin starten.
-                    Ohne Angabe wird das Profil "privat" verwendet.
-
-  shell [profil]    Eine bash-Shell in der laufenden Sandbox öffnen.
-
-  allow <host> [profil]
-                    Einen Host für diese Sandbox freigeben.
-
-  doctor            Prüfen, ob alles bereitsteht.
-
-  rm [profil]       Die Sandbox entfernen (fragt vorher nach).
-
-Profile werden in ~/.config/devbox/devbox.conf definiert.
-Vorlage: devbox.conf.example
-EOF
+  printf '%s\n' \
+    'devbox — eine Claude-Sandbox für mehrere Projekte' \
+    '' \
+    'Aufruf: ./devbox.sh <kommando> [profil]' \
+    '' \
+    '  build [--force]   Image bauen und als sbx-Template registrieren.' \
+    '                    Übersprungen, solange sich das Dockerfile nicht geändert hat.' \
+    '' \
+    '  up [profil]       Sandbox anlegen (beim ersten Mal) und Claude darin starten.' \
+    '                    Ohne Angabe wird das Profil "privat" verwendet.' \
+    '' \
+    '  shell [profil]    Eine bash-Shell in der laufenden Sandbox öffnen.' \
+    '' \
+    '  allow <host> [profil]' \
+    '                    Einen Host für diese Sandbox freigeben.' \
+    '' \
+    '  status            Zeigen, was läuft: Template, unsere Sandboxes, deren Stand.' \
+    '' \
+    '  update            Template neu bauen und sagen, welche Sandboxes es noch' \
+    '                    nicht erreicht hat.' \
+    '' \
+    '  doctor            Prüfen, ob der Host alles bereithält.' \
+    '' \
+    '  rm [profil]       Die Sandbox entfernen (fragt vorher nach).' \
+    '' \
+    'Profile werden in ~/.config/devbox/devbox.conf definiert.' \
+    'Vorlage: devbox.conf.example'
 }
 
 # --- Einstiegspunkt ----------------------------------------------------------
@@ -334,6 +507,8 @@ case "${1:-}" in
   up)     shift; require_tools; cmd_up     "$@" ;;
   shell)  shift; require_tools; cmd_shell  "$@" ;;
   allow)  shift; require_tools; cmd_allow  "$@" ;;
+  status) shift; require_tools; cmd_status "$@" ;;
+  update) shift; require_tools; cmd_update "$@" ;;
   rm)     shift; require_tools; cmd_rm     "$@" ;;
   doctor) shift;                cmd_doctor "$@" ;;
   ""|-h|--help|help) usage ;;
