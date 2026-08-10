@@ -102,23 +102,47 @@ RUN npm install -g pnpm@10.11.0
 # auch für den Laufzeit-Benutzer `agent` — und sie steckt im Image, überlebt
 # also ein `sbx rm` samt Neuanlegen.
 #
-# Die Funktionen greifen NUR zur Laufzeit. Die RUN-Schritte oben laufen ohne
-# sie, das Image baut also ohne Zwischenschicht. Fehlt der aikido-Shim einmal,
-# fällt jede Funktion mit einer Warnung auf das echte Werkzeug zurück, statt
-# den Befehl scheitern zu lassen. Die Prüfungen erreichen *.aikido.dev — der
-# Host steht in der Erlaubnisliste des Wrappers.
-RUN npm install -g @aikidosec/safe-chain
-
-RUN cat >> /etc/sandbox-persistent.sh <<'EOF'
-
-# Aikido Safe Chain — Paketmanager abfangen und vor der Installation prüfen.
-npm()  { if command -v aikido-npm  >/dev/null 2>&1; then aikido-npm  "$@"; else echo "Warnung: safe-chain fehlt; npm ungeschuetzt."  >&2; command npm  "$@"; fi; }
-npx()  { if command -v aikido-npx  >/dev/null 2>&1; then aikido-npx  "$@"; else echo "Warnung: safe-chain fehlt; npx ungeschuetzt."  >&2; command npx  "$@"; fi; }
-pnpm() { if command -v aikido-pnpm >/dev/null 2>&1; then aikido-pnpm "$@"; else echo "Warnung: safe-chain fehlt; pnpm ungeschuetzt." >&2; command pnpm "$@"; fi; }
-pnpx() { if command -v aikido-pnpx >/dev/null 2>&1; then aikido-pnpx "$@"; else echo "Warnung: safe-chain fehlt; pnpx ungeschuetzt." >&2; command pnpx "$@"; fi; }
-uv()   { if command -v aikido-uv   >/dev/null 2>&1; then aikido-uv   "$@"; else echo "Warnung: safe-chain fehlt; uv ungeschuetzt."   >&2; command uv   "$@"; fi; }
-uvx()  { if command -v aikido-uvx  >/dev/null 2>&1; then aikido-uvx  "$@"; else echo "Warnung: safe-chain fehlt; uvx ungeschuetzt."  >&2; command uvx  "$@"; fi; }
-EOF
+# ⚠️  Wir bauen SHIMS, keine Shell-Funktionen. Der Unterschied ist nicht
+#     kosmetisch, sondern eine Sicherheitslücke — nachgemessen beim Bauen dieses
+#     Repos: Eine Shell-Funktion existiert nur IN der Shell. Jeder Aufruf, der
+#     `npm` als Programm startet, geht daran vorbei:
+#
+#       timeout 60 npm install boesartig     # timeout startet die Binärdatei
+#       env npm install boesartig            # env ebenso
+#       xargs -n1 npm install < liste        # xargs ebenso
+#       sbx exec solobox npm install ...     # gar keine Shell dazwischen
+#
+#     Genau so ging das offizielle Testpaket `safe-chain-test` durch, während
+#     derselbe Befehl ohne `timeout` blockiert wurde. Shims sind dagegen echte
+#     Dateien auf dem PATH und greifen auch ohne Shell.
+#
+# Die sed-Zeile in jedem Shim nimmt das Shim-Verzeichnis aus dem PATH, BEVOR das
+# echte Werkzeug aufgerufen wird. Ohne das würde `aikido-npm` intern wieder
+# unseren `npm`-Shim finden und sich endlos selbst aufrufen.
+#
+# Die Shims greifen NUR zur Laufzeit: Sie kommen erst über die PATH-Zeile in
+# /etc/sandbox-persistent.sh (siehe unten) zum Zug, die RUN-Schritte hier bauen
+# ohne sie. Fehlt der aikido-Shim einmal, fällt der Shim mit einer Warnung auf
+# das echte Werkzeug zurück, statt den Befehl scheitern zu lassen. Die Prüfungen
+# erreichen *.aikido.dev — der Host steht in der Erlaubnisliste des Wrappers.
+RUN npm install -g @aikidosec/safe-chain \
+    && mkdir -p /opt/safe-chain/shims \
+    && for tool in npm npx pnpm pnpx uv uvx; do \
+         printf '%s\n' \
+           '#!/bin/sh' \
+           '# Von solobox erzeugter Safe-Chain-Shim — siehe solobox/Dockerfile.' \
+           '# Shim-Verzeichnis aus dem PATH nehmen, sonst ruft aikido-* uns erneut auf.' \
+           'PATH="$(printf "%s" "$PATH" | sed -e "s|/opt/safe-chain/shims:||g")"' \
+           'export PATH' \
+           "if command -v aikido-$tool >/dev/null 2>&1; then" \
+           "  exec aikido-$tool \"\$@\"" \
+           'else' \
+           "  echo \"Warnung: safe-chain fehlt — $tool läuft ungeschützt.\" >&2" \
+           "  exec $tool \"\$@\"" \
+           'fi' \
+           > "/opt/safe-chain/shims/$tool"; \
+       done \
+    && chmod -R a+rx /opt/safe-chain/shims
 
 # --- Playwright mit Chromium -------------------------------------------------
 # Chromium landet im gemeinsamen, für alle lesbaren Cache /ms-playwright, damit
@@ -177,10 +201,33 @@ RUN ln -sf "$(uv python find 3.10)" /usr/local/bin/python3.10 \
 # jedem bash-Aufruf ein. Weil es im Image steckt, überlebt es das Entfernen und
 # Neuanlegen der Sandbox. Immer anhängen (>>), nie überschreiben — und keine
 # Shell-Completion-Skripte hier hineinschreiben.
-RUN echo 'export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright' >> /etc/sandbox-persistent.sh \
-    && echo 'export PNPM_HOME="$HOME/.local/share/pnpm"' >> /etc/sandbox-persistent.sh \
-    && echo 'export PATH="$PNPM_HOME:$PATH"' >> /etc/sandbox-persistent.sh \
-    && echo 'export UV_PYTHON_INSTALL_DIR=/opt/uv-python' >> /etc/sandbox-persistent.sh
+# Der Safe-Chain-Schalter: Ist SOLOBOX_SAFE_CHAIN nicht gesetzt, gilt 1 (an).
+# Zum Abschalten in der laufenden Sandbox:
+#   export SOLOBOX_SAFE_CHAIN=0
+RUN { \
+      echo ''; \
+      echo '# --- solobox --------------------------------------------------'; \
+      echo 'export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright'; \
+      echo 'export UV_PYTHON_INSTALL_DIR=/opt/uv-python'; \
+      echo 'export PNPM_HOME="$HOME/.local/share/pnpm"'; \
+      echo ''; \
+      echo '# Diese Datei wird bei verschachtelten Shells mehrfach gesourct.'; \
+      echo '# Ohne Prüfung würde derselbe Eintrag den PATH jedes Mal weiter'; \
+      echo '# aufblähen — deshalb hängen wir nur an, was noch nicht drin ist.'; \
+      echo 'solobox_pfad_voranstellen() {'; \
+      echo '  case ":$PATH:" in'; \
+      echo '    *":$1:"*) ;;'; \
+      echo '    *) PATH="$1:$PATH"; export PATH ;;'; \
+      echo '  esac'; \
+      echo '}'; \
+      echo 'solobox_pfad_voranstellen "$PNPM_HOME"'; \
+      echo ''; \
+      echo '# Safe Chain: prüft Pakete auf Malware, bevor sie installiert werden.'; \
+      echo '# Abschalten mit: export SOLOBOX_SAFE_CHAIN=0'; \
+      echo 'if [ "${SOLOBOX_SAFE_CHAIN:-1}" = "1" ]; then'; \
+      echo '  solobox_pfad_voranstellen /opt/safe-chain/shims'; \
+      echo 'fi'; \
+    } >> /etc/sandbox-persistent.sh
 
 # --- Optional: gcloud CLI ----------------------------------------------------
 # Bewusst NICHT eingebaut — es macht das Image spürbar größer, und die meisten

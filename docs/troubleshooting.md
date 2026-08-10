@@ -501,6 +501,45 @@ in die abgeleitete `settings.json` auf. Wer weniger Radius will, startet
 `solobox up` im Projekt statt in `~/dev` — das wirkt stärker als jede
 Einstellung.
 
+## solobox: `npm install safe-chain-test` wird nicht blockiert
+
+Der Schutz ist nicht aktiv. Prüfen, ob das Shim-Verzeichnis vorne im `PATH`
+steht:
+
+```bash
+sbx exec solobox bash -lc 'echo "$PATH" | tr ":" "\n" | head -3'
+# /opt/safe-chain/shims sollte dabei sein
+sbx exec solobox bash -lc 'command -v npm; type -t npm'
+# /opt/safe-chain/shims/npm   und   file
+```
+
+Sagt `type -t npm` etwas anderes als `file`, wurde `/etc/sandbox-persistent.sh`
+nicht gelesen — das passiert bei `sbx exec` **ohne** Shell:
+
+```bash
+sbx exec solobox bash -lc 'npm install foo'   # richtig
+sbx exec solobox npm install foo              # PATH nicht gesetzt
+```
+
+Oder der Schalter steht auf aus:
+
+```bash
+sbx exec solobox bash -lc 'echo "${SOLOBOX_SAFE_CHAIN:-1}"'
+```
+
+Scharftest:
+
+```bash
+sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/null && npm install safe-chain-test'
+# ✖ Safe-chain: Malicious changes detected
+```
+
+> **Historie:** Bis zur Shim-Fassung war der Schutz hier eine Shell-Funktion.
+> Die ließ sich mit `timeout npm install …`, `env npm install …` oder `xargs`
+> aushebeln, weil eine Funktion kein Programm ist. Falls du ein älteres Image
+> benutzt (`type -t npm` sagt `function`), baue neu: `solobox update`, danach
+> `solobox rm && solobox up`.
+
 ## `/plugin` kann in der Sandbox nichts installieren
 
 Erwartet. `~/.claude/plugins` ist **read-only** eingehängt. Plugins installierst

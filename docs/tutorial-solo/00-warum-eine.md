@@ -62,24 +62,103 @@ Beide bringen Python 3.10, 3.12 und 3.14 mit (3.12 als Standard, `uv` wählt per
 devbox auch — eine Sandbox für alle Projekte muss alles können, aber das galt
 für den Dach-Ordner aus devbox-Kapitel 5 genauso.
 
-Die drei echten Unterschiede:
+Die zwei echten Unterschiede:
 
-**1. Safe Chain als Shell-Funktionen statt als PATH-Shims.**
-devbox legt Shims nach `/opt/safe-chain/shims` und schaltet sie über eine
-PATH-Zeile an und aus. solobox schreibt Shell-Funktionen direkt in
-`/etc/sandbox-persistent.sh`. Beides fängt `npm`/`pnpm`/`uv` ab, bevor ein Paket
-installiert wird; der Shim-Weg ist an- und abschaltbar, der Funktionsweg kürzer.
-
-**2. `@playwright/mcp` ist vorgewärmt.**
+**1. `@playwright/mcp` ist vorgewärmt.**
 Nur ein Eintrag im npm-Cache, damit der MCP-Server beim ersten Start nicht erst
 lädt. Registriert wird er nicht — MCP-Server kommen in solobox über Plugins oder
 `sbx mcp add` (Kapitel 4).
 
-**3. Ein gcloud-Block liegt auskommentiert bereit.**
+**2. Ein gcloud-Block liegt auskommentiert bereit.**
 Er macht das Image spürbar größer, deshalb ist er aus. Wer ihn braucht, entfernt
 die Kommentarzeichen — die zwei zugehörigen Hosts stehen daneben.
 
-### Die Falle, in die diese Fassung zuerst getappt ist
+Der Schalter für Safe Chain heißt hier `SOLOBOX_SAFE_CHAIN` statt
+`DEVBOX_SAFE_CHAIN`, damit sich die beiden Varianten auf einer Maschine nicht in
+die Quere kommen. Ansonsten ist der Schutz identisch aufgebaut — und das ist,
+wie der nächste Abschnitt zeigt, kein Zufall, sondern das Ergebnis eines
+misslungenen Versuchs.
+
+## Safe Chain: warum es Shims sein müssen
+
+Der Schutz vor Schadcode in Paketen liegt in beiden Varianten als **Shim** unter
+`/opt/safe-chain/shims` und kommt über eine PATH-Zeile in
+`/etc/sandbox-persistent.sh` zum Zug.
+
+Die erste Fassung dieses Images machte es anders — mit Shell-Funktionen, die
+`npm`, `pnpm` und `uv` abfangen. Das sieht kürzer aus und funktioniert im
+Alltag. Prüf zuerst, dass der Schutz überhaupt greift:
+
+```bash
+sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/null && npm install safe-chain-test'
+```
+
+```
+✖ Safe-chain: Malicious changes detected:
+ - safe-chain-test@0.0.1-security
+Safe-chain: Exiting without installing malicious packages.
+```
+
+### ⚠️ Der Test, der zu leicht besteht
+
+Genau hier ist beim Bauen dieses Repos etwas schiefgegangen. Derselbe Test, nur
+mit einer Zeitbegrenzung davor:
+
+```bash
+timeout 120 npm install safe-chain-test
+# added 1 package, and audited 2 packages in 679ms
+# found 0 vulnerabilities
+```
+
+**Das Schadpaket wurde installiert.** Nicht weil Safe Chain versagt hätte,
+sondern weil eine Shell-**Funktion** nur in der Shell existiert. `timeout`
+startet ein *Programm* — und eine Funktion kann es gar nicht aufrufen. Dieselbe
+Lücke hat jeder Aufruf, bei dem kein Shell-Wort ausgewertet wird:
+
+```bash
+timeout 60 npm install boesartig       # timeout startet die Binärdatei
+env npm install boesartig              # env ebenso
+xargs -n1 npm install < liste.txt      # xargs ebenso
+sbx exec solobox npm install ...       # gar keine Shell dazwischen
+```
+
+Ein Schutz, den man mit einem vorangestellten `env` aushebelt, ist keiner.
+
+### Deshalb Shims
+
+Ein Shim ist eine echte Datei unter `/opt/safe-chain/shims/npm`, die auf dem
+`PATH` **vor** dem echten `npm` steht. Damit greift er auch dort, wo es keine
+Shell gibt. Nachgemessen im fertigen Image:
+
+```bash
+docker run --rm solobox/base:latest bash -lc 'command -v npm; type -t npm'
+# /opt/safe-chain/shims/npm
+# file        <- eine Datei, keine Funktion
+```
+
+Und alle drei Varianten werden jetzt geblockt:
+
+| Aufruf | mit Funktion | mit Shim |
+| --- | --- | --- |
+| `npm install safe-chain-test` | blockiert | blockiert |
+| `timeout 120 npm install …` | **durchgelassen** | blockiert |
+| `env npm install …` | **durchgelassen** | blockiert |
+
+> 🎯 **Eine Shell-Funktion ist Bequemlichkeit, kein Schutzmechanismus.** Wer
+> etwas abfangen will, muss es dort abfangen, wo Programme gesucht werden — im
+> `PATH`.
+
+Jeder Shim nimmt das Shim-Verzeichnis übrigens per `sed` aus dem `PATH`, bevor
+er das echte Werkzeug aufruft. Ohne das fände `aikido-npm` intern wieder unseren
+`npm`-Shim und riefe sich endlos selbst auf.
+
+Abschalten, wenn Safe Chain einmal im Weg steht:
+
+```bash
+export SOLOBOX_SAFE_CHAIN=0
+```
+
+## Die zweite Falle, in die diese Fassung getappt ist
 
 Im Dockerfile steht bei pnpm ein ausdrückliches „bewusst **nicht** über
 corepack". Der Grund ist gemessen, nicht theoretisch: `corepack prepare
@@ -135,11 +214,13 @@ Und ein Blick ins Image, ohne dafür eine Sandbox anzulegen:
 
 ```bash
 docker run --rm solobox/base:latest bash -lc \
-  'python --version; python3.10 --version; python3.14 --version; node --version; pnpm --version; jq --version'
+  'python --version; python3.10 --version; python3.14 --version; node --version; pnpm --version; jq --version; command -v npm'
 ```
 
 Erwartet: Python 3.12 als `python`, daneben 3.10 und 3.14, Node 24, pnpm 10 —
-und bei `pnpm` **keine** Corepack-Download-Meldung.
+und bei `pnpm` **keine** Corepack-Download-Meldung. Die letzte Zeile muss
+`/opt/safe-chain/shims/npm` sagen: dann steht der Malware-Schutz vor dem echten
+`npm`.
 
 ---
 

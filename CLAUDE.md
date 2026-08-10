@@ -53,6 +53,10 @@ prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
 - **pnpm nie über `corepack`.** Die Aktivierung landet im Cache des Bau-Users,
   und `agent` lädt zur Laufzeit still eine andere Version nach. Nachgemessen,
   siehe Kommentar im Dockerfile.
+- **Safe Chain nie als Shell-Funktion.** Funktionen existieren nur in der Shell;
+  `timeout npm install …`, `env npm …` und `xargs … npm` hebeln sie aus —
+  nachgemessen, das Testpaket ging durch. Es müssen Shims im `PATH` sein, wie in
+  `devbox/Dockerfile`. Schalter heißt hier `SOLOBOX_SAFE_CHAIN`.
 
 ## Aufbau
 

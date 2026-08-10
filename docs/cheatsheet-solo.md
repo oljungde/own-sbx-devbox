@@ -100,6 +100,25 @@ sbx stop solobox          # anhalten (Zustand bleibt)
 sbx rm --force solobox    # entfernen (Zustand weg)
 ```
 
+## Safe Chain (Malware-Schutz vor der Installation)
+
+```bash
+# greift der Schutz?
+sbx exec solobox bash -lc 'command -v npm; type -t npm'
+# /opt/safe-chain/shims/npm   und   file
+
+# Scharftest mit dem offiziellen Testpaket
+sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/null && npm install safe-chain-test'
+# ✖ Safe-chain: Malicious changes detected
+
+# abschalten, wenn er im Weg steht
+export SOLOBOX_SAFE_CHAIN=0
+```
+
+⚠️ Immer eine Shell dazwischen: `sbx exec solobox npm …` umgeht
+`/etc/sandbox-persistent.sh` und damit den `PATH`. Richtig ist
+`sbx exec solobox bash -lc 'npm …'`.
+
 ## Netz
 
 ```bash
