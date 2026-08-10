@@ -370,6 +370,45 @@ das nicht gewollt ist, gibt es `--no-share-skills`. Drei Entscheidungen dazu:
 - **Fällt das Flag weg, bricht nichts.** Der Wrapper fragt dann nach, statt
   abzubrechen oder stillschweigend in den geteilten Store zu schreiben.
 
+### Beobachtete Tatsachen statt Merkzettel
+
+devbox merkt sich in `~/.local/state/devbox/`, aus welchem Dockerfile gebaut und
+aus welchem Template angelegt wurde. Das funktioniert — solange die Datei da ist.
+Sie fehlt aber, sobald jemand aufräumt, auf einem zweiten Rechner arbeitet oder
+das Image von Hand mit `docker save` + `sbx template load` lädt. Dann behauptet
+der Wrapper Dinge, die er nicht weiß.
+
+solobox leitet denselben Befund deshalb aus vier **beobachtbaren** Quellen ab:
+
+| Ebene | Quelle | Kosten |
+|---|---|---|
+| Image gegen Dockerfile | Label `solobox.dockerfile-sha` im Image | `build` |
+| Template gegen Image | Image-ID gegen `sbx template ls` | `build` |
+| Sandbox gegen Image | `/etc/solobox-stamp` in der Sandbox | `rm` + `up` |
+| Mounts gegen Konfiguration | `sbx ls --json` gegen `gewuenschte_mounts()` | `rm` + `up` |
+
+Drei Entscheidungen dazu:
+
+- **Der Stempel steht am ENDE des Dockerfiles.** Ein neuer Stempelwert entwertet
+  den Build-Cache ab der Zeile, in der er benutzt wird. Weiter oben würde jede
+  Änderung das Playwright- und Python-Kapitel neu bauen.
+- **`gewuenschte_mounts()` ist die einzige Quelle der Mount-Liste.** `provision`
+  legt danach an, `check` vergleicht dagegen. Zwei getrennte Listen wären ein
+  Fehler, den man erst bemerkt, wenn ein Ordner monatelang fehlt.
+- **Eine gestoppte Sandbox wird zum Prüfen nicht gestartet.** `sbx exec` würde
+  sie hochfahren; ein `status`, das im Hintergrund einen Container startet, ist
+  eine Überraschung, die niemand bestellt hat. Dann sagt der Check ehrlich, dass
+  er es nicht wissen kann.
+
+Der Exitcode ist die höchste nötige Stufe (0 aktuell, 1 `sync`, 2 `build`,
+3 `rm` + `up`) — der Sinn ist nicht, irgendetwas zu melden, sondern die
+**billigste ausreichende** Maßnahme zu nennen.
+
+Eine Falle beim Bauen dieses Kommandos, die im Skript auskommentiert steht:
+`pruefe_stand | sed 's/^/  /'` steckt die Funktion in eine Subshell, und die
+gesetzte Stufe ist beim Aufrufer wieder 0. Die Befunde stimmten, der Exitcode
+war immer 0. Deshalb bekommt die Funktion ihre Einrückung als **Parameter**.
+
 ### Was solobox aufgibt
 
 | Aufgegeben                    | Konsequenz                                  |

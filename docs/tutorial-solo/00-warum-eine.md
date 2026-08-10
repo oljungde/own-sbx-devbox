@@ -206,6 +206,15 @@ sbx template ls | grep solobox
 
 Erwartet: eine Zeile mit `docker.io/solobox/base` und Tag `latest`.
 
+Oder in einem Rutsch, samt der Frage, ob überhaupt noch etwas zu tun ist:
+
+```bash
+./solobox/solobox.sh check
+```
+
+Was dieses Kommando alles beantwortet, steht in
+[Kapitel 6](06-der-wrapper.md#check--muss-ich-neu-bauen).
+
 Kommt stattdessen `ERROR: Not authenticated to Docker`, fehlt `sbx login`. Das
 sieht von außen genauso aus wie „Template nicht vorhanden" — deshalb sagt
 `solobox status` bei dieser Lage ausdrücklich beides.

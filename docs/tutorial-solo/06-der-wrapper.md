@@ -94,6 +94,77 @@ solobox sync
 Das führt genau die Schritte aus, die `up` vor dem Start macht — ohne Start. Die
 laufende Claude-Sitzung sieht neue Skills nach einem Neustart der Sitzung.
 
+### `check` — muss ich neu bauen?
+
+Die Frage „muss ich etwas neu bauen?" hat **vier** Ursachen, und sie kosten sehr
+unterschiedlich viel. Genau das ist der Punkt dieses Kommandos: nicht irgendetwas
+melden, sondern die **billigste ausreichende Maßnahme** nennen.
+
+```bash
+solobox check
+```
+
+| Ebene | Frage | Woran es erkannt wird | Maßnahme |
+| --- | --- | --- | --- |
+| 1 | Ist das lokale Image auf dem Stand des Dockerfiles? | Label `solobox.dockerfile-sha` gegen `shasum` der Datei | `solobox build` |
+| 2 | Liegt dieses Image auch im sbx-Store? | Image-ID gegen `sbx template ls` | `solobox build` |
+| 3 | Läuft die Sandbox auf diesem Image? | `/etc/solobox-stamp` in der Sandbox | `solobox rm && solobox up` |
+| 4 | Passen die Mounts zur Konfiguration? | `sbx ls --json` gegen `ROOTS` + `CLAUDE_SHARED` | `solobox rm && solobox up` |
+
+Ebene 4 ist die, die man ohne Werkzeug übersieht: Ergänzt du `ROOTS` um einen
+Ordner, ändert sich **nichts** — die Sandbox hat ihre Workspaces beim Anlegen
+bekommen und kennt den neuen Pfad nie. `check` vergleicht deshalb, was
+eingehängt *ist*, mit dem, was eingehängt *würde*:
+
+```
+--- 4. Mounts gegen Konfiguration ---
+  ✗ Sandbox passt nicht zur Konfiguration — 'solobox rm && solobox up'
+      fehlt in der Sandbox:  /Users/du/dev/work
+      Grund: Workspaces sind nur beim Anlegen setzbar.
+```
+
+Der Exitcode ist die höchste nötige Stufe — damit taugt `check` auch für ein
+Skript oder eine CI:
+
+| Code | Bedeutung |
+| --- | --- |
+| 0 | alles aktuell |
+| 1 | `solobox sync` genügt |
+| 2 | `solobox build` nötig |
+| 3 | `solobox rm && solobox up` nötig |
+
+```bash
+solobox check || echo "Handlungsbedarf, Stufe $?"
+solobox check --base     # fragt zusätzlich die Registry (Netz, ein paar Sekunden)
+```
+
+`up` ruft denselben Check vor dem Start auf und **fragt** bei Stufe 3, ob es die
+Sandbox jetzt neu anlegen soll — mit der Ansage, was das kostet. Es löscht nie
+ungefragt.
+
+### Warum ein Stempel im Image und keine Merkdatei
+
+Frühere Fassungen merkten sich den Dockerfile-Hash in
+`~/.local/state/solobox/`. Das geht schief, sobald diese Datei fehlt — nach
+einem Aufräumen, auf einem zweiten Rechner, oder wenn das Image von Hand mit
+`docker save` + `sbx template load` geladen wurde. Dann meldete `status`
+„Herkunft unbekannt", und der Check war wertlos.
+
+Deshalb trägt jedes Image seine Herkunft jetzt **selbst** mit sich:
+
+```bash
+docker image inspect solobox/base:latest \
+  --format '{{index .Config.Labels "solobox.dockerfile-sha"}}'
+sbx exec solobox cat /etc/solobox-stamp
+shasum -a 256 solobox/Dockerfile | cut -d' ' -f1     # muss übereinstimmen
+```
+
+> 🎯 **Beobachtete Tatsachen schlagen Merkzettel.** Ein Merkzettel kann fehlen
+> oder lügen; ein Label im Image und eine Datei in der Sandbox können es nicht.
+
+Die Merkdatei gibt es weiterhin — aber nur noch als Rückfall für Images, die
+noch keinen Stempel tragen.
+
 ### `status` — und die Zeile, die man nicht überliest
 
 ```bash

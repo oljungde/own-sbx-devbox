@@ -545,9 +545,51 @@ sbx exec solobox bash -lc 'cd /tmp && mkdir -p sc && cd sc && npm init -y >/dev/
 Erwartet. `~/.claude/plugins` ist **read-only** eingehängt. Plugins installierst
 du auf dem Host; danach holt `solobox sync` sie in die laufende Sandbox.
 
-## `solobox status` sagt „Template vorhanden, Herkunft unbekannt"
+## `solobox check` sagt, die Sandbox müsse neu angelegt werden
 
-Das Template liegt im sbx-Store, aber im State-Ordner
-(`~/.local/state/solobox/image.hash`) steht kein Merkzettel — typisch, wenn das
-Image von Hand mit `docker save` + `sbx template load` geladen wurde. Harmlos.
-Ein `solobox build --force` legt den Merkzettel an.
+Zwei Ursachen führen zu Stufe 3, und `check` nennt immer die konkrete:
+
+**„Sandbox läuft auf einem ÄLTEREN Image"** — das Dockerfile wurde geändert und
+neu gebaut, aber ein neues Template erreicht eine bestehende Sandbox nicht.
+Container werden beim Anlegen aus dem Template kopiert, nicht laufend
+angeglichen.
+
+**„Sandbox passt nicht zur Konfiguration"** — `ROOTS` oder `CLAUDE_SHARED`
+enthalten einen Pfad, den die Sandbox nicht eingehängt hat (oder umgekehrt).
+Workspaces sind nur beim Anlegen setzbar; `check` zeigt, welcher Pfad fehlt.
+
+Beides kostet beim Beheben den Claude-Login:
+
+```bash
+solobox rm && solobox up
+```
+
+Willst du es nicht: `solobox up` startet auf Nachfrage auch die alte Sandbox
+weiter — die Änderung gilt dort dann eben nicht.
+
+## `solobox check` sagt „Image trägt keinen Stempel"
+
+Das Image wurde mit einer solobox-Version vor der Stempel-Einführung gebaut.
+Harmlos, aber die Ebenen 1 und 3 können dann nichts prüfen:
+
+```bash
+solobox build --force
+```
+
+Danach trägt das Image sein Label und `/etc/solobox-stamp`.
+
+## `solobox check` meldet „kein Template im Store", obwohl gebaut wurde
+
+Fast immer fehlt die Docker-Anmeldung — `sbx template ls` endet dann mit
+`ERROR: Not authenticated to Docker`, und von außen sieht das genauso aus wie
+„nichts gebaut":
+
+```bash
+sbx login
+solobox check
+```
+
+Kommen dabei Zeilen wie
+`open .../com.docker.sandboxes/.../settings.json.lock: operation not permitted`,
+darf der aufrufende Prozess nicht auf das Zustandsverzeichnis von `sbx` zugreifen
+— dann `solobox` aus einem normalen Terminal starten.

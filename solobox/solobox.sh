@@ -28,6 +28,11 @@ set -euo pipefail
 # Der Name ist Programm: eine Sandbox, ein Name, kein Profil-Parameter.
 SANDBOX="solobox"
 IMAGE="solobox/base:latest"
+
+# Das Basis-Image aus der ersten Zeile des Dockerfiles. Steht hier nur, damit
+# `check --base` fragen kann, ob es sich in der Registry bewegt hat. Ändert sich
+# die FROM-Zeile, gehört diese hier mitgeändert.
+BASE_IMAGE="docker/sandbox-templates:claude-code-docker"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/solobox"
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -247,6 +252,74 @@ supports_no_share_skills() {
   ! sbx create claude --no-share-skills 2>&1 | grep -qi 'unknown flag'
 }
 
+# --- Woher weiß solobox, was gebaut werden muss? -----------------------------
+#
+# Alle folgenden Helfer lesen BEOBACHTBARE Tatsachen aus, keine Merkzettel. Der
+# Unterschied ist nicht akademisch: Eine Merkdatei unter ~/.local/state kann
+# fehlen, gelöscht werden oder auf einem zweiten Rechner nie existiert haben —
+# und dann behauptet der Wrapper Dinge, die er nicht weiß.
+#
+# Jedes `|| true` steht da, weil ein fehlendes Image, ein nicht angemeldeter
+# Docker oder eine gestoppte Sandbox NORMALE Zustände sind. Eine leere Antwort
+# ist hier die richtige Antwort; die Aufrufer behandeln sie.
+
+# Der Stempel, den das lokal gebaute Image trägt (siehe Dockerfile, ganz unten).
+image_stamp() {
+  docker image inspect "$IMAGE" \
+    --format '{{index .Config.Labels "solobox.dockerfile-sha"}}' 2>/dev/null || true
+}
+
+# Der Basis-Image-Digest, gegen den zuletzt gebaut wurde.
+image_base_digest() {
+  docker image inspect "$IMAGE" \
+    --format '{{index .Config.Labels "solobox.base-digest"}}' 2>/dev/null || true
+}
+
+# Die kurze ID des lokal gebauten Images. `sbx template ls` zeigt dieselbe ID,
+# sobald das Image geladen ist — damit ist Ebene 2 ohne Merkdatei prüfbar.
+local_image_id() {
+  docker images --format '{{.ID}}' "$IMAGE" 2>/dev/null | head -n1 || true
+}
+
+# Der aktuelle Digest des Basis-Images in der Registry. Braucht Netz und ein paar
+# Sekunden — deshalb nur auf Anforderung (`check --base`).
+basis_digest() {
+  docker buildx imagetools inspect "$BASE_IMAGE" \
+    --format '{{.Manifest.Digest}}' 2>/dev/null || true
+}
+
+sandbox_running() {
+  sbx ls 2>/dev/null | awk -v n="$SANDBOX" 'NR>1 && $1==n && $3=="running" { gefunden=1 } END { exit !gefunden }'
+}
+
+# Der Stempel der laufenden Sandbox. Bewusst NUR wenn sie läuft: `sbx exec`
+# würde eine gestoppte Sandbox starten, und ein `status`, das im Hintergrund
+# einen Container hochfährt, ist eine Überraschung, die niemand bestellt hat.
+sandbox_stamp() {
+  sandbox_running || return 0
+  sbx exec "$SANDBOX" cat /etc/solobox-stamp 2>/dev/null | tr -d '\r\n' || true
+}
+
+# Die Workspaces, die die Sandbox TATSÄCHLICH eingehängt hat — inklusive ":ro".
+#
+# Warum `--json` und trotzdem kein jq? Weil jq auf dem Host nicht vorausgesetzt
+# werden soll (dieselbe Begründung wie bei template_id). Die Ausgabe ist
+# eingerückt und hat genau einen Workspace pro Zeile; awk schneidet den Block
+# der eigenen Sandbox heraus und liest die Zeichenketten zwischen den
+# Anführungszeichen.
+aktuelle_mounts() {
+  sbx ls --json 2>/dev/null | awk -v n="\"$SANDBOX\"" '
+    $1 == "\"name\":" && $2 == n","      { treffer = 1 }
+    treffer && $1 == "\"workspaces\":"   { drin = 1; next }
+    drin && /\]/                         { exit }
+    drin {
+      gsub(/[",]/, "")                 # Anführungszeichen und Kommas weg
+      gsub(/^[ \t]+|[ \t]+$/, "")      # Einrückung weg — sonst passt kein Vergleich
+      if ($0 != "") print
+    }
+  ' || true
+}
+
 # --- build: Image bauen und als sbx-Template registrieren --------------------
 #
 # Warum der Umweg über eine tar-Datei? Der Docker-Daemon, den sbx benutzt, ist
@@ -265,7 +338,21 @@ cmd_build() {
   fi
 
   info "baue Image '$IMAGE' ..."
-  docker build -t "$IMAGE" -f "$DOCKERFILE" "$SCRIPT_DIR"
+  # Die beiden Stempel wandern als Build-Argumente ins Image (siehe Dockerfile,
+  # ganz unten). Daran erkennt `solobox check` später, woraus eine Sandbox
+  # entstanden ist — ohne auf eine Merkdatei angewiesen zu sein.
+  #
+  # Der Basis-Digest ist eine Registry-Abfrage und darf scheitern (offline,
+  # nicht angemeldet). Dann steht "unbekannt" im Image, und `check --base`
+  # sagt das auch so, statt etwas zu behaupten.
+  local basis
+  basis="$(basis_digest)"
+  [ -n "$basis" ] || basis="unbekannt"
+
+  docker build -t "$IMAGE" -f "$DOCKERFILE" \
+    --build-arg SOLOBOX_STAMP="$now" \
+    --build-arg SOLOBOX_BASE_DIGEST="$basis" \
+    "$SCRIPT_DIR"
 
   local tarball
   tarball="$(mktemp -t solobox-image.XXXXXX.tar)"
@@ -283,8 +370,30 @@ cmd_build() {
 }
 
 # --- Sandbox anlegen ---------------------------------------------------------
+# Die vollständige Workspace-Liste, mit der die Sandbox angelegt WÜRDE — in
+# genau der Reihenfolge, in der `sbx create` sie bekommt.
+#
+# Diese Funktion ist die EINZIGE Quelle dafür. `provision` legt danach an,
+# `cmd_check` vergleicht damit gegen die tatsächlich eingehängte Liste. Zwei
+# getrennte Listen wären eine Fehlerquelle, die man erst bemerkt, wenn ein
+# Ordner monatelang fehlt.
+#
+# Nebenwirkung mit Absicht: fehlende ~/.claude-Unterordner werden angelegt. sbx
+# bricht sonst beim Anlegen ab, und auf frisch eingerichteten Rechnern fehlt
+# z.B. ~/.claude/workflows.
+gewuenschte_mounts() {
+  local d
+  printf '%s\n' "${ROOTS[@]}"
+  for d in "${CLAUDE_SHARED[@]}"; do
+    mkdir -p "$HOME/.claude/$d"
+    # Die Klammern um $d sind kein Zierrat: in zsh würde "$HOME/.claude/$d:ro"
+    # als History-Modifier ":r" gelesen und ergäbe "…/agentso".
+    printf '%s\n' "$HOME/.claude/${d}:ro"
+  done
+}
+
 provision() {
-  local mounts=() d flags=() eintrag pfad
+  local mounts=() flags=() eintrag pfad
 
   # Vorab prüfen, statt sbx mitten im Anlegen scheitern zu lassen. sbx nimmt nur
   # Verzeichnisse; eine Datei quittiert es mit "workspace path exists but is not
@@ -301,15 +410,11 @@ provision() {
     fi
   done
 
-  # sbx bricht ab, wenn ein einzuhängender Ordner nicht existiert. Auf frisch
-  # eingerichteten Rechnern fehlt z.B. ~/.claude/workflows — also legen wir die
-  # fehlenden Ordner still an, statt den Start scheitern zu lassen.
-  for d in "${CLAUDE_SHARED[@]}"; do
-    mkdir -p "$HOME/.claude/$d"
-    # Die Klammern um $d sind kein Zierrat: in zsh würde "$HOME/.claude/$d:ro"
-    # als History-Modifier ":r" gelesen und ergäbe "…/agentso".
-    mounts+=("$HOME/.claude/${d}:ro")
-  done
+  # Prozess-Substitution, keine Pipe: Eine Pipe steckte die Schleife in eine
+  # Subshell, und das gefüllte Array wäre danach wieder leer.
+  while IFS= read -r eintrag; do
+    mounts+=("$eintrag")
+  done < <(gewuenschte_mounts)
 
   if [ "$ISOLATE_SKILLS" = "1" ]; then
     if supports_no_share_skills; then
@@ -331,7 +436,6 @@ provision() {
   info "lege Sandbox '$SANDBOX' aus Template '$IMAGE' an ..."
   info "Wurzeln: ${ROOTS[*]}"
   sbx create ${flags[@]+"${flags[@]}"} -t "$IMAGE" --name "$SANDBOX" claude \
-    "${ROOTS[@]}" \
     "${mounts[@]}"
 
   # Festhalten, aus welchem Template diese Sandbox entstanden ist — `sbx ls`
@@ -573,19 +677,44 @@ cmd_up() {
 
   # Ohne Template geht nichts — und statt zu meckern, bauen wir es beim ersten
   # Mal einfach.
-  local vermerk
-  vermerk="$(recorded_hash)"
+  # Ohne Template geht nichts — statt zu meckern, bauen wir es beim ersten Mal.
   if [ -z "$(template_id)" ]; then
     info "kein Template '$IMAGE' im sbx-Store — ich baue es jetzt."
     cmd_build
-  elif [ -z "$vermerk" ]; then
-    # Template da, aber kein Merkzettel: typisch, wenn es von Hand geladen wurde
-    # (docker save + sbx template load). Kein Grund zur Warnung — wir wissen
-    # schlicht nicht, aus welchem Dockerfile es stammt.
-    info "Template vorhanden, Herkunft unbekannt (kein Merkzettel im State-Ordner)."
-  elif [ "$(current_hash)" != "$vermerk" ]; then
-    warn "Das Dockerfile hat sich seit dem letzten Bau geändert."
-    warn "Die Sandbox startet auf dem ALTEN Template. Neu bauen: 'solobox update'."
+  fi
+
+  # Der Stand-Check, bevor irgendetwas startet. Er beantwortet in einem Aufwasch
+  # die vier Fragen, die man sonst einzeln übersieht — vor allem die, ob die
+  # bestehende Sandbox überhaupt noch zu ROOTS und CLAUDE_SHARED passt.
+  local stufe=0
+  pruefe_stand >/dev/null || true
+  stufe="$STUFE"
+
+  if [ "$stufe" -ge 3 ] && sandbox_exists; then
+    echo
+    warn "Die bestehende Sandbox passt nicht mehr zum aktuellen Stand:"
+    pruefe_stand "" "   "
+    echo
+    warn "Das Angleichen verlangt ein Neuanlegen. Dabei gehen verloren:"
+    warn "  - der Claude-Login"
+    warn "  - zur Laufzeit installierte Pakete"
+    warn "  - Änderungen an /etc/sandbox-persistent.sh"
+    warn "Deine Projektdateien liegen auf dem Host und bleiben unberührt."
+    local antwort
+    read -r -p "Sandbox jetzt neu anlegen? [j/N] " antwort
+    case "$antwort" in
+      [jJyY]*)
+        info "entferne und lege neu an ..."
+        sbx rm --force "$SANDBOX"
+        rm -f "$(sandbox_image_file)"
+        ;;
+      *)
+        warn "gut — ich starte die bestehende Sandbox. Die Änderung gilt darin NICHT."
+        ;;
+    esac
+  elif [ "$stufe" -eq 2 ]; then
+    warn "Das Dockerfile ist neuer als das Template — 'solobox update'."
+    warn "Die Sandbox startet solange auf dem alten Stand ('solobox check' zeigt Details)."
   fi
 
   local frisch=0
@@ -632,6 +761,185 @@ cmd_up() {
   fi
 }
 
+# --- check: muss etwas neu gebaut oder neu angelegt werden? ------------------
+#
+# Die Frage „muss ich neu bauen?" hat vier Ursachen, und sie kosten sehr
+# unterschiedlich viel. Der Sinn dieses Kommandos ist nicht, irgendetwas zu
+# melden, sondern die BILLIGSTE ausreichende Maßnahme zu nennen:
+#
+#   Stufe 1  sync    Sekunden — neue Skills, Plugins, Hooks, MCP-Server
+#   Stufe 2  build   Minuten  — das Dockerfile hat sich geändert
+#   Stufe 3  rm+up   teuer    — kostet den Claude-Login und Laufzeitpakete
+#
+# Der Exitcode ist die höchste nötige Stufe (0 = alles aktuell). Damit lässt
+# sich der Check auch in einem Skript oder in der CI benutzen.
+#
+# Wird von `status`, `doctor` und `up` mitbenutzt — es soll nur EINE Wahrheit
+# geben, nicht drei Stellen, die dasselbe unterschiedlich beantworten.
+STUFE=0
+PRAEFIX=""
+
+# ⚠️  Warum die Einrückung ein PARAMETER ist und keine Pipe:
+#     `pruefe_stand | sed 's/^/  /'` sieht harmlos aus, steckt die Funktion aber
+#     in eine Subshell — und dann ist $STUFE beim Aufrufer wieder 0. Dasselbe
+#     gilt für `$(pruefe_stand)`. Beim Bauen dieses Kommandos genau so
+#     hineingelaufen: Die Befunde stimmten, der Exitcode war immer 0.
+zeile() { printf '%s%s\n' "$PRAEFIX" "$*"; }
+
+# Eine Befundzeile ausgeben und dabei die nötige Stufe anheben. Die Stufe kann
+# nur steigen — der teuerste Befund gewinnt.
+#
+# Das `|| true` ist nötig, nicht kosmetisch: Unter `set -e` gilt ein `[ … ]`,
+# das am Ende einer Funktion nicht zutrifft, als fehlgeschlagenes Kommando und
+# würde das Skript beenden.
+melde() {
+  local stufe="$1" zeichen="$2" text="$3"
+  [ "$stufe" -gt "$STUFE" ] && STUFE="$stufe" || true
+  printf '%s  %s %s\n' "$PRAEFIX" "$zeichen" "$text"
+}
+
+pruefe_stand() {
+  local mit_basis="${1:-}"
+  PRAEFIX="${2:-}"
+  STUFE=0
+
+  local dockerfile_hash stempel_image image_id template
+  dockerfile_hash="$(current_hash)"
+  stempel_image="$(image_stamp)"
+  image_id="$(local_image_id)"
+  template="$(template_id)"
+
+  zeile "--- 1. Lokales Image gegen Dockerfile ---"
+  if [ -z "$image_id" ]; then
+    melde 2 "✗" "kein lokales Image '$IMAGE' — 'solobox build'"
+  elif [ -z "$stempel_image" ] || [ "$stempel_image" = "unbekannt" ]; then
+    melde 2 "·" "Image trägt keinen Stempel (vor dieser solobox-Version gebaut)"
+    zeile "      Ein 'solobox build --force' bringt ihn an."
+  elif [ "$stempel_image" = "$dockerfile_hash" ]; then
+    melde 0 "✓" "Image ist auf dem Stand des Dockerfiles"
+  else
+    melde 2 "✗" "Dockerfile hat sich geändert — 'solobox build'"
+  fi
+
+  zeile "--- 2. Template im sbx-Store ---"
+  if [ -z "$template" ]; then
+    melde 2 "✗" "kein Template '$IMAGE' im Store — 'solobox build'"
+    zeile "      (Oder du bist nicht angemeldet: 'sbx login'. Beides sieht gleich aus.)"
+  elif [ -n "$image_id" ] && [ "$template" != "$image_id" ]; then
+    melde 2 "✗" "Store hat ein anderes Image ($template) als der lokale Bau ($image_id)"
+    zeile "      Das lokale Image wurde gebaut, aber nicht geladen — 'solobox build'."
+  else
+    melde 0 "✓" "Template im Store entspricht dem lokalen Image"
+  fi
+
+  # Bevor über die Sandbox geurteilt wird: antwortet sbx überhaupt? Eine leere
+  # Liste heißt "keine Sandbox", ein FEHLER heißt "ich weiß es nicht" — und das
+  # ist etwas völlig anderes. Ohne diese Unterscheidung würde ein fehlendes
+  # `sbx login` als "keine Sandbox vorhanden" durchgehen (dieselbe Falle wie bei
+  # template_id, nur mit schlimmerer Folge: 'up' würde eine zweite anlegen
+  # wollen).
+  local sbx_antwortet=1
+  sbx ls -q >/dev/null 2>&1 || sbx_antwortet=0
+
+  zeile "--- 3. Sandbox gegen Template ---"
+  if [ "$sbx_antwortet" -eq 0 ]; then
+    melde 0 "·" "sbx antwortet nicht — übersprungen (angemeldet? 'sbx login')"
+  elif ! sandbox_exists; then
+    melde 0 "·" "keine Sandbox vorhanden — 'solobox up' legt sie aus dem aktuellen Template an"
+  else
+    local stempel_sandbox
+    stempel_sandbox="$(sandbox_stamp)"
+    if [ -n "$stempel_sandbox" ]; then
+      if [ "$stempel_sandbox" = "$dockerfile_hash" ]; then
+        melde 0 "✓" "Sandbox läuft auf dem aktuellen Dockerfile"
+      else
+        melde 3 "✗" "Sandbox läuft auf einem ÄLTEREN Image — 'solobox rm && solobox up'"
+      fi
+    elif ! sandbox_running; then
+      melde 0 "·" "Sandbox gestoppt — Stempel nicht lesbar, ohne sie zu starten"
+      zeile "      Prüfe es nach dem nächsten Start, oder: sbx exec solobox cat /etc/solobox-stamp"
+    else
+      # Läuft, hat aber keinen Stempel: aus einem Image ohne Stempel angelegt.
+      local vermerk; vermerk="$(recorded_sandbox_image)"
+      if [ -n "$vermerk" ] && [ -n "$template" ] && [ "$vermerk" != "$template" ]; then
+        melde 3 "✗" "Sandbox stammt aus Template $vermerk, im Store liegt $template"
+      else
+        melde 0 "·" "Sandbox trägt keinen Stempel (vor dieser solobox-Version angelegt)"
+      fi
+    fi
+  fi
+
+  zeile "--- 4. Mounts gegen Konfiguration ---"
+  if [ "$sbx_antwortet" -eq 0 ]; then
+    zeile "  · sbx antwortet nicht — übersprungen"
+  elif ! sandbox_exists; then
+    zeile "  · keine Sandbox — nichts zu vergleichen"
+  else
+    local soll ist fehlend ueberzaehlig
+    soll="$(gewuenschte_mounts | sort)"
+    ist="$(aktuelle_mounts | sort)"
+    if [ -z "$ist" ]; then
+      melde 0 "·" "Mounts nicht lesbar (sbx ls --json) — übersprungen"
+    else
+      fehlend="$(comm -23 <(printf '%s\n' "$soll") <(printf '%s\n' "$ist"))"
+      ueberzaehlig="$(comm -13 <(printf '%s\n' "$soll") <(printf '%s\n' "$ist"))"
+      if [ -z "$fehlend" ] && [ -z "$ueberzaehlig" ]; then
+        melde 0 "✓" "eingehängte Ordner entsprechen der Konfiguration"
+      else
+        melde 3 "✗" "Sandbox passt nicht zur Konfiguration — 'solobox rm && solobox up'"
+        # Mehrzeilige Listen mit sed einrücken statt mit Wortauftrennung im
+        # printf — sonst zerlegt ein Leerzeichen im Pfad die Ausgabe.
+        local eintrag
+        for eintrag in $fehlend; do zeile "      fehlt in der Sandbox:  $eintrag"; done
+        for eintrag in $ueberzaehlig; do zeile "      übrig in der Sandbox: $eintrag"; done
+        zeile "      Grund: Workspaces sind nur beim Anlegen setzbar."
+      fi
+    fi
+  fi
+
+  if [ "$mit_basis" = "--base" ]; then
+    zeile "--- 5. Basis-Image in der Registry ---"
+    local gebaut aktuell
+    gebaut="$(image_base_digest)"
+    aktuell="$(basis_digest)"
+    if [ -z "$aktuell" ]; then
+      melde 0 "·" "Registry nicht erreichbar — übersprungen"
+    elif [ -z "$gebaut" ] || [ "$gebaut" = "unbekannt" ]; then
+      melde 0 "·" "Image hält den Basis-Digest nicht fest (älterer Bau)"
+    elif [ "$gebaut" = "$aktuell" ]; then
+      melde 0 "✓" "Basis-Image unverändert"
+    else
+      melde 2 "!" "Basis-Image hat sich bewegt — 'docker build --pull' bzw. 'solobox update'"
+      zeile "      gebaut gegen: $gebaut"
+      zeile "      jetzt aktuell: $aktuell"
+    fi
+  fi
+
+  return 0
+}
+
+cmd_check() {
+  local mit_basis=""
+  case "${1:-}" in
+    "") ;;
+    --base) mit_basis="--base" ;;
+    *) die "Unbekannte Option '$1'. Erlaubt: --base" ;;
+  esac
+
+  pruefe_stand "$mit_basis"
+
+  echo
+  case "$STUFE" in
+    0) info "Alles aktuell — nichts zu tun." ;;
+    1) info "Es genügt: solobox sync" ;;
+    2) warn "Neu bauen nötig: solobox build   (danach ggf. 'solobox rm && solobox up')" ;;
+    3) warn "Neu anlegen nötig: solobox rm && solobox up"
+       warn "Das kostet den Claude-Login und zur Laufzeit installierte Pakete."
+       warn "Deine Projektdateien liegen auf dem Host und bleiben unberührt." ;;
+  esac
+  return "$STUFE"
+}
+
 # --- Weitere Kommandos -------------------------------------------------------
 
 cmd_shell() {
@@ -672,49 +980,30 @@ cmd_rm() {
 
 # --- status: was läuft, mit welchen Wurzeln, und wer teilt den Skill-Store ---
 cmd_status() {
-  local id
-  id="$(template_id)"
-
-  echo "--- Template ---"
-  if [ -n "$id" ]; then
-    printf '  ✓ %s  (ID %s)\n' "$IMAGE" "$id"
-    local vermerk_bau; vermerk_bau="$(recorded_hash)"
-    if [ -z "$vermerk_bau" ]; then
-      echo "    Herkunft unbekannt (kein Merkzettel) — 'solobox build --force' legt ihn an"
-    elif [ "$(current_hash)" = "$vermerk_bau" ]; then
-      echo "    Dockerfile unverändert seit dem letzten Bau"
-    else
-      echo "    ! Dockerfile hat sich geändert — 'solobox update'"
-    fi
-  else
-    echo "  ✗ kein Template '$IMAGE' im sbx-Store"
-    echo "    Entweder noch nicht gebaut ('solobox build') — oder du bist nicht"
-    echo "    angemeldet ('sbx login'). Beides sieht von hier gleich aus."
-  fi
-
   echo "--- Die Sandbox ---"
   if sandbox_exists; then
-    local zustand vermerk
+    local zustand
     zustand="$(sbx ls 2>/dev/null | awk -v n="$SANDBOX" 'NR>1 && $1==n { print $3; exit }' || true)"
-    vermerk="$(recorded_sandbox_image)"
-    if [ -z "$vermerk" ]; then
-      vermerk="Template unbekannt"
-    elif [ "$vermerk" = "$id" ]; then
-      vermerk="Template aktuell"
-    else
-      vermerk="Template VERALTET ($vermerk) — 'solobox update' erklärt, was zu tun ist"
-    fi
-    printf '  %-10s %-9s %s\n' "$SANDBOX" "${zustand:-?}" "$vermerk"
+    printf '  %-10s %s\n' "$SANDBOX" "${zustand:-?}"
 
     # Die Wurzeln stehen hier, weil sie NUR beim Anlegen gesetzt wurden — nach
     # ein paar Wochen weiß niemand mehr auswendig, was die Sandbox sieht.
     echo "  Eingehängt:"
-    sbx ls 2>/dev/null \
-      | awk -v n="$SANDBOX" -F'   +' 'NR>1 && $1 ~ ("^" n) { print $NF }' \
-      | tr ',' '\n' | sed 's/^ */    /' || true
+    aktuelle_mounts | sed 's/^/    /'
   else
     echo "  (keine — 'solobox up' im gewünschten Projekt)"
   fi
+
+  # Ein und dieselbe Prüfung wie in `check`, `doctor` und `up`. Drei Stellen,
+  # die dasselbe unterschiedlich beantworten, wären schlimmer als gar keine.
+  echo "--- Stand (wie 'solobox check') ---"
+  pruefe_stand "" "  "
+  case "$STUFE" in
+    0) echo "  → alles aktuell" ;;
+    1) echo "  → 'solobox sync' genügt" ;;
+    2) echo "  → 'solobox build' nötig" ;;
+    3) echo "  → 'solobox rm && solobox up' nötig" ;;
+  esac
 
   echo "--- MCP-Server (auf dem Host registriert) ---"
   sbx mcp ls 2>&1 | sed 's/^/  /' || true
@@ -818,16 +1107,9 @@ cmd_doctor() {
     printf '  · %s fehlt — "solobox install" legt ihn an\n' "$BIN_LINK"
   fi
 
-  echo "--- Template ---"
-  local vermerk; vermerk="$(recorded_hash)"
-  if [ -z "$vermerk" ]; then
-    echo "  · kein Merkzettel — Herkunft des Templates unbekannt"
-    echo "    (typisch nach 'docker save' + 'sbx template load' von Hand)"
-  elif [ "$(current_hash)" = "$vermerk" ]; then
-    echo "  ✓ Template ist auf dem Stand des Dockerfiles"
-  else
-    echo "  ! Dockerfile hat sich geändert — 'solobox build'"
-  fi
+  echo "--- Stand von Image, Template und Sandbox ---"
+  pruefe_stand "" "  "
+  [ "$STUFE" -eq 0 ] || ok=1
 
   echo "--- Konfiguration ---"
   if [ -f "$CONFIG_FILE" ]; then
@@ -906,6 +1188,13 @@ usage() {
     '  build [--force]' \
     '                Image bauen und als sbx-Template registrieren.' \
     '' \
+    '  check [--base]' \
+    '                Prüfen, ob etwas neu gebaut oder neu angelegt werden muss —' \
+    '                und die BILLIGSTE ausreichende Maßnahme nennen.' \
+    '                Exitcode: 0 aktuell, 1 sync, 2 build, 3 rm+up.' \
+    '                --base fragt zusätzlich die Registry, ob sich das' \
+    '                Basis-Image bewegt hat (braucht Netz).' \
+    '' \
     '  sync          Skills, Settings und MCP-Server in die LAUFENDE Sandbox' \
     '                nachziehen, ohne sie neu anzulegen.' \
     '' \
@@ -933,6 +1222,7 @@ usage() {
 case "${1:-}" in
   up)      shift; require_tools; load_config; cmd_up      "$@" ;;
   build)   shift; require_tools; load_config; cmd_build   "$@" ;;
+  check)   shift; require_tools; load_config; cmd_check   "$@" ;;
   sync)    shift; require_tools; load_config; cmd_sync    "$@" ;;
   shell)   shift; require_tools; load_config; cmd_shell   "$@" ;;
   allow)   shift; require_tools; load_config; cmd_allow   "$@" ;;

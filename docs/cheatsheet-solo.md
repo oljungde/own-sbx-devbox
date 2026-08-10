@@ -36,6 +36,37 @@ solobox shell             # bash statt Claude
 solobox status            # was läuft, mit welchen Wurzeln
 ```
 
+## Muss ich neu bauen? — `solobox check`
+
+```bash
+solobox check          # vier Ebenen prüfen, billigste Maßnahme nennen
+solobox check --base   # zusätzlich: hat sich das Basis-Image bewegt? (Netz)
+solobox check || echo "Stufe $?"
+```
+
+| Ebene | Frage | Maßnahme |
+|---|---|---|
+| 1 | Image auf dem Stand des Dockerfiles? | `solobox build` |
+| 2 | Image auch im sbx-Store? | `solobox build` |
+| 3 | Sandbox auf diesem Image? | `solobox rm && solobox up` |
+| 4 | Mounts passen zu `ROOTS`/`CLAUDE_SHARED`? | `solobox rm && solobox up` |
+
+| Exitcode | Bedeutung |
+|---|---|
+| 0 | alles aktuell |
+| 1 | `solobox sync` genügt |
+| 2 | `solobox build` nötig |
+| 3 | `solobox rm && solobox up` nötig |
+
+Von Hand nachsehen, woraus etwas entstanden ist:
+
+```bash
+docker image inspect solobox/base:latest \
+  --format '{{index .Config.Labels "solobox.dockerfile-sha"}}'
+sbx exec solobox cat /etc/solobox-stamp
+shasum -a 256 solobox/Dockerfile | cut -d' ' -f1
+```
+
 ## Wenn sich auf dem Host etwas geändert hat
 
 | Geändert                          | Kommando                               | Wirkt                     |
@@ -52,6 +83,7 @@ solobox status            # was läuft, mit welchen Wurzeln
 | Kommando                  | Was es tut                                                                 |
 | ------------------------- | -------------------------------------------------------------------------- |
 | `solobox up [pfad]`       | Sandbox anlegen (einmalig) und Claude starten — in `$PWD` oder in `[pfad]` |
+| `solobox check [--base]`  | Prüfen, ob neu gebaut/angelegt werden muss (Exitcode 0/1/2/3)              |
 | `solobox build [--force]` | Image bauen, als sbx-Template laden                                        |
 | `solobox sync`            | Skills, Settings, MCP in die laufende Sandbox nachziehen                   |
 | `solobox shell [pfad]`    | bash in der Sandbox                                                        |

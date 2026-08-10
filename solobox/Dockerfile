@@ -245,4 +245,27 @@ RUN { \
 # Dazu gehören zwei Hosts in die Netz-Erlaubnisliste (EXTRA_HOSTS in der Conf):
 #   packages.cloud.google.com   und   *.googleapis.com
 
+# --- Stempel: woraus ist dieses Image entstanden? ----------------------------
+# Damit `solobox check` beantworten kann, ob eine laufende Sandbox noch zum
+# aktuellen Dockerfile passt, trägt jedes Image seine Herkunft selbst mit sich:
+# einmal als Label (vom Host aus lesbar) und einmal als Datei (aus der Sandbox
+# heraus lesbar). Ohne das bliebe nur eine Merkdatei auf dem Host — und die kann
+# fehlen, verloren gehen oder auf einem anderen Rechner nie existiert haben.
+#
+# Keine Zirkularität, auch wenn es so aussieht: Gehasht wird der TEXT dieses
+# Dockerfiles. Der Wert kommt von außen über --build-arg und steht nirgends in
+# der Datei, kann den eigenen Hash also nicht verändern.
+#
+# Dieser Block steht bewusst ganz am ENDE: Ein neuer Stempelwert entwertet den
+# Build-Cache ab der Zeile, in der er zuerst benutzt wird. Weiter oben würde
+# jede Dockerfile-Änderung das Playwright- und Python-Kapitel neu bauen —
+# Minuten, für nichts.
+ARG SOLOBOX_STAMP=unbekannt
+ARG SOLOBOX_BASE_DIGEST=unbekannt
+LABEL solobox.dockerfile-sha=$SOLOBOX_STAMP
+LABEL solobox.base-digest=$SOLOBOX_BASE_DIGEST
+RUN printf '%s\n' "$SOLOBOX_STAMP" > /etc/solobox-stamp \
+    && printf '%s\n' "$SOLOBOX_BASE_DIGEST" > /etc/solobox-base-digest \
+    && chmod a+r /etc/solobox-stamp /etc/solobox-base-digest
+
 USER agent

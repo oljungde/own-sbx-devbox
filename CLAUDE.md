@@ -53,6 +53,15 @@ prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
 - **pnpm nie über `corepack`.** Die Aktivierung landet im Cache des Bau-Users,
   und `agent` lädt zur Laufzeit still eine andere Version nach. Nachgemessen,
   siehe Kommentar im Dockerfile.
+- **Neue Einträge in `CLAUDE_SHARED` oder `ROOTS` sind Neuanlege-Ursachen.** Die
+  Mount-Liste kommt ausschließlich aus `gewuenschte_mounts()` — `provision` legt
+  danach an, `pruefe_stand` vergleicht dagegen. Wer eine zweite Liste einführt,
+  bricht den Drift-Check.
+- **Der Stempelblock bleibt am Ende des Dockerfiles.** Weiter oben entwertet ein
+  neuer Stempelwert den Build-Cache aller darüberliegenden Schichten.
+- **`pruefe_stand` nie in eine Pipe oder `$(…)` stecken.** Subshell heißt: die
+  gesetzte Stufe geht verloren, der Exitcode ist dann immer 0. Die Einrückung ist
+  deshalb ein Parameter.
 - **Safe Chain nie als Shell-Funktion.** Funktionen existieren nur in der Shell;
   `timeout npm install …`, `env npm …` und `xargs … npm` hebeln sie aus —
   nachgemessen, das Testpaket ging durch. Es müssen Shims im `PATH` sein, wie in
