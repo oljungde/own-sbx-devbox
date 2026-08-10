@@ -91,6 +91,10 @@ load_profile() {
   # Vor dem Laden zurücksetzen, damit ein unvollständiges Profil auffällt statt
   # heimlich Werte eines anderen zu erben.
   NAME=""; WORKSPACES=(); EXTRA_HOSTS=()
+  # Die Bequemlichkeits-Schalter sind bewusst AUS, wenn ein Profil sie nicht
+  # setzt. Wer sie einschaltet, trifft damit eine Entscheidung — siehe
+  # share_everything() weiter unten.
+  SHARE_ALL=0; MCP_SERVERS=(); MCP_CONFIG=""
   # shellcheck disable=SC2034  # wird nicht hier, sondern in der Profildatei gelesen
   DEVBOX_PROFILE="$profile"
   # shellcheck disable=SC1090
@@ -222,6 +226,13 @@ cmd_up() {
 
   apply_network
   link_shared_config
+  # Bewusst ein `if` und keine `&&`-Kette: Unter `set -e` würde ein nicht
+  # zutreffendes `[ … ] && funktion` als fehlgeschlagenes Kommando gelten und
+  # das Skript an dieser Stelle stumm beenden.
+  if [ "$SHARE_ALL" = "1" ]; then
+    share_everything
+  fi
+  load_mcp
 
   info "starte Claude in '$SANDBOX' ..."
   sbx run --name "$SANDBOX" claude
@@ -271,6 +282,146 @@ link_shared_config() {
       ln -sfn \"\$quelle\" \"\$ziel\"
     done
   "
+}
+
+# --- SHARE_ALL: Skills in den geteilten Store, Plugins aktivieren ------------
+#
+# ⚠️  Das hier ist der bewusste Verzicht auf zwei Trennungen, die der Wrapper
+#     sonst einhält. Standardmäßig AUS. Wer `SHARE_ALL=1` ins Profil schreibt,
+#     entscheidet sich für:
+#
+#     1. Skills landen im Store von sbx — und der ist read-write und wird von
+#        ALLEN Sandboxes dieser Maschine geteilt. Auf einem Rechner, auf dem nur
+#        deine eigenen Sandboxes laufen, ist das gewollt bequem. Auf einem
+#        geteilten Rechner ist es ein Seitenkanal zwischen fremden Sandboxes.
+#
+#     2. Es entsteht eine `~/.claude/settings.json` IN der Sandbox, die alle
+#        installierten Plugins aktiviert. Sie enthält bewusst NUR
+#        `enabledPlugins` — die settings.json des Hosts wird weiterhin nicht
+#        gemountet, ihre Berechtigungen gelten für den Host, nicht für einen
+#        Container.
+#
+# Beides ist Kopie bzw. Ableitung, kein Mount: Änderungen auf dem Host wirken
+# erst beim nächsten `up`.
+
+# Warum python3 und nicht jq? Weil jq auf dem Host nicht vorausgesetzt werden
+# soll — und wir hier ohnehin IN der Sandbox rechnen, wo Python 3.12 aus dem
+# Dockerfile garantiert vorhanden ist. Argumente nach `-c` landen in sys.argv,
+# das erspart uns verschachtelte Anführungszeichen.
+PLUGIN_PY='
+import json, pathlib, sys
+
+# argv[1] ist das HOME des Hosts. Der Ordner ~/.claude/plugins ist unter genau
+# diesem Pfad in die Sandbox gemountet.
+quelle = pathlib.Path(sys.argv[1]) / ".claude" / "plugins" / "installed_plugins.json"
+if not quelle.exists():
+    raise SystemExit(0)
+
+plugins = json.loads(quelle.read_text()).get("plugins", {})
+if not plugins:
+    print("keine installierten Plugins gefunden")
+    raise SystemExit(0)
+
+# Die Schlüssel haben bereits die Form "name@marktplatz" — genau das, was
+# enabledPlugins erwartet.
+ziel = pathlib.Path.home() / ".claude" / "settings.json"
+cfg = json.loads(ziel.read_text()) if ziel.exists() else {}
+cfg.setdefault("enabledPlugins", {}).update({name: True for name in plugins})
+ziel.parent.mkdir(parents=True, exist_ok=True)
+ziel.write_text(json.dumps(cfg, indent=2) + "\n")
+print("aktiviert: " + ", ".join(sorted(plugins)))
+'
+
+share_everything() {
+  info "SHARE_ALL: kopiere globale Skills in den geteilten sbx-Store ..."
+  # Warum tar und nicht `cp -r`? Ist ein Skill-Ordner auf dem Host
+  # schreibgeschützt (555), legt `cp` das Zielverzeichnis mit denselben Rechten
+  # an und kann anschließend nichts mehr hineinschreiben — der Skill fehlt, und
+  # zwar mit einer Meldung, die nach einer Lappalie aussieht ("setting
+  # permissions ... Permission denied"). `--no-preserve=mode` hilft dagegen
+  # nicht, es gilt für Dateien, nicht für die Verzeichnisse.
+  #
+  # tar setzt die Rechte der Zielverzeichnisse erst zum SCHLUSS und schreibt
+  # deshalb sauber hinein — auch beim zweiten und dritten `up`. Nachgemessen in
+  # einem Ubuntu-Container mit read-only gemounteter Quelle, beide Varianten
+  # dreimal hintereinander.
+  #
+  # Die einfachen Anführungszeichen sind Absicht: $1 und $HOME sollen NICHT hier
+  # auf dem Host expandieren, sondern erst in der Sandbox.
+  # shellcheck disable=SC2016
+  sbx exec "$SANDBOX" bash -c '
+    set -uo pipefail
+    quelle="$1/.claude/skills"
+    ziel="$HOME/.claude/skills"
+    [ -d "$quelle" ] || exit 0
+    mkdir -p "$ziel"
+    ( cd "$quelle" && tar cf - . ) | ( cd "$ziel" && tar xf - --no-same-permissions )
+    printf "kopiert: %s Skill-Ordner\n" "$(find "$ziel" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d " ")"
+  ' _ "$HOME" || warn "Skills konnten nicht kopiert werden — die Sandbox läuft trotzdem."
+
+  info "SHARE_ALL: aktiviere alle installierten Plugins ..."
+  sbx exec "$SANDBOX" python3 -c "$PLUGIN_PY" "$HOME" \
+    || warn "Plugins konnten nicht aktiviert werden — die Sandbox läuft trotzdem."
+}
+
+# --- MCP-Server in die Sandbox bringen ---------------------------------------
+#
+# Zwei Quellen, weil es zwei Arten von Servern gibt:
+#
+#   MCP_SERVERS  Bei `sbx mcp add` registrierte Server. Sie laufen AUSSERHALB
+#                der Sandbox, `sbx` reicht sie über sein Gateway hinein. Das ist
+#                der Weg für alles mit OAuth-Anmeldung (Linear, Notion, …):
+#                der Anmeldeflow passiert einmal auf dem Host.
+#
+#   MCP_CONFIG   Eine Datei im Format von .mcp.json. Ihre `mcpServers` werden in
+#                die ~/.claude.json der Sandbox übernommen und gelten dort für
+#                alle Projekte. Das ist der Ersatz dafür, dass die ~/.claude.json
+#                des Hosts NICHT gemountet wird — die enthält neben den Servern
+#                auch Sitzungszustand und hat in einem Container nichts verloren.
+#
+# Beide Wege brauchen freigeschaltete Hosts. Ein MCP-Server, dessen Ziel nicht in
+# der Policy steht, startet und kommt trotzdem nicht raus (siehe `allow`).
+MCP_PY='
+import json, pathlib
+
+quelle = pathlib.Path("/tmp/devbox-mcp.json")
+server = json.loads(quelle.read_text()).get("mcpServers", {})
+if not server:
+    print("keine mcpServers in der Datei")
+    raise SystemExit(0)
+
+# Vorhandenes bleibt stehen — in dieser Datei liegt auch der Zustand, den Claude
+# selbst dort ablegt.
+ziel = pathlib.Path.home() / ".claude.json"
+cfg = json.loads(ziel.read_text()) if ziel.exists() else {}
+cfg.setdefault("mcpServers", {}).update(server)
+ziel.write_text(json.dumps(cfg, indent=2) + "\n")
+print("übernommen: " + ", ".join(sorted(server)))
+'
+
+load_mcp() {
+  local server
+  for server in ${MCP_SERVERS[@]+"${MCP_SERVERS[@]}"}; do
+    info "lade MCP-Server '$server' ..."
+    sbx mcp load "$server" --sandbox "$SANDBOX" \
+      || warn "'$server' ließ sich nicht laden. 'sbx mcp ls' zeigt die registrierten Server."
+  done
+
+  [ -n "$MCP_CONFIG" ] || return 0
+  if [ ! -f "$MCP_CONFIG" ]; then
+    warn "MCP_CONFIG '$MCP_CONFIG' existiert nicht — übersprungen."
+    return 0
+  fi
+
+  info "übernehme mcpServers aus $MCP_CONFIG ..."
+  # Der Umweg über /tmp, weil die Datei außerhalb der Workspaces liegen darf und
+  # dann in der Sandbox nicht sichtbar wäre.
+  if sbx cp "$MCP_CONFIG" "$SANDBOX:/tmp/devbox-mcp.json"; then
+    sbx exec "$SANDBOX" python3 -c "$MCP_PY" \
+      || warn "mcpServers konnten nicht übernommen werden — die Sandbox läuft trotzdem."
+  else
+    warn "'$MCP_CONFIG' ließ sich nicht in die Sandbox kopieren."
+  fi
 }
 
 # --- Weitere Kommandos -------------------------------------------------------

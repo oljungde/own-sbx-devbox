@@ -239,6 +239,78 @@ sbx mcp load linear --sandbox devbox-privat
 
 Registrierte Server ansehen: `sbx mcp ls`.
 
+## Alles auf einmal — und was es kostet
+
+Bis hierhin hat dieses Kapitel jede Trennung verteidigt: Skills nicht in den
+geteilten Store, `settings.json` nicht mounten, MCP pro Projekt. Diese Trennungen
+haben genau einen Grund — **andere Sandboxes auf derselben Maschine**.
+
+Auf einem Rechner, auf dem nur deine eigenen Sandboxes laufen, gibt es dieses
+Gegenüber nicht. Dann ist die Trennung Aufwand ohne Gegenwert, und du darfst sie
+zurücknehmen. Wichtig ist nur: **bewusst**, nicht aus Versehen. Deshalb steht der
+Schalter im Profil und nicht im Skript:
+
+```bash
+alles)
+  NAME="alles"
+  WORKSPACES=( "$HOME/dev/own" )
+  EXTRA_HOSTS=( 'mcp.context7.com' )
+
+  SHARE_ALL=1
+  MCP_SERVERS=( linear )
+  MCP_CONFIG="$HOME/.config/devbox/mcp.json"
+  ;;
+```
+
+`SHARE_ALL=1` löst beim `up` zwei Schritte aus:
+
+```bash
+# 1. Skills in den geteilten Store kopieren
+( cd "$HOST_HOME/.claude/skills" && tar cf - . ) \
+  | ( cd ~/.claude/skills && tar xf - --no-same-permissions )
+
+# 2. eine settings.json IN der Sandbox schreiben, die alle installierten
+#    Plugins aktiviert — abgeleitet aus installed_plugins.json
+```
+
+**Warum `tar` und nicht `cp -r`?** Das sieht nach Angeberei aus, ist aber ein
+gemessener Unterschied. Ist ein Skill-Ordner auf dem Host schreibgeschützt
+(`555`, bei aus einem Repo ausgecheckten Skills nicht selten), legt `cp` das
+Zielverzeichnis mit denselben Rechten an — und kann danach nichts mehr
+hineinschreiben:
+
+```text
+cp: setting permissions for '.../mein-skill': Permission denied
+```
+
+Das liest sich wie eine Lappalie, aber der Skill ist danach **nicht** da. Und
+`--no-preserve=mode` hilft nicht: Es gilt für Dateien, nicht für Verzeichnisse.
+`tar` setzt die Verzeichnisrechte erst zum Schluss und schreibt deshalb sauber
+hinein, auch beim zweiten und dritten `up`.
+
+Die Lehre daraus ist allgemeiner als der Befehl: Ein Schritt, der bei **jedem**
+Start läuft, muss zweimal hintereinander funktionieren. Teste ihn auch zweimal.
+
+`MCP_SERVERS` und `MCP_CONFIG` bedienen die beiden Server-Arten von oben: die bei
+`sbx mcp` registrierten (Weg ②) und die selbstgeschriebenen (Weg ①), letztere
+nicht projektlokal, sondern für alle Projekte der Sandbox.
+
+**Was du dafür aufgibst:**
+
+| | mit `SHARE_ALL=1` |
+|---|---|
+| Skill-Store | read-write und mit **allen** Sandboxes der Maschine geteilt |
+| Aktualität | Kopie — neue Skills und Plugins erst nach dem nächsten `up` |
+| Plugin-Aktivierung | pauschal alle installierten, nicht projektweise ausgewählt |
+
+**Was bleibt:** Die `settings.json` des Hosts wird weiterhin nicht gemountet. Die
+Datei in der Sandbox wird *erzeugt* und enthält nur `enabledPlugins` — die
+Host-Berechtigungen bleiben auf dem Host. Diese eine Trennung geben wir auch im
+Bequemlichkeitsmodus nicht auf, weil sie nichts kostet.
+
+Standard ist `SHARE_ALL=0`. Wer nichts einträgt, bekommt das Verhalten aus dem
+Rest dieses Kapitels.
+
 ---
 
 ## Abnahme dieses Kapitels

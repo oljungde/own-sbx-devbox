@@ -207,13 +207,19 @@ sbx exec devbox-privat bash -c 'ls /Users/DEINNAME/.claude/skills'
 Brauchst du einen davon, kopiere ihn nach `.claude/skills/` des Projekts — dort
 wird er zuverlässig gefunden und ist nebenbei versioniert.
 
-Wer den geteilten Store bewusst nutzen will:
+Wer den geteilten Store bewusst nutzen will, setzt `SHARE_ALL=1` im Profil —
+dann kopiert jedes `up` die globalen Skills selbst dorthin:
 
 ```bash
-sbx skills import
+$EDITOR ~/.config/devbox/devbox.conf     # SHARE_ALL=1 im gewünschten Profil
+./devbox/devbox.sh up privat
 ```
 
-⚠️ Das wirkt auf **alle** Sandboxes des Rechners, nicht nur auf devbox.
+Von Hand ginge auch `sbx skills import`.
+
+⚠️ Beides wirkt auf **alle** Sandboxes des Rechners, nicht nur auf devbox. Die
+Abwägung steht in
+[Kapitel 6](tutorial/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet).
 
 ---
 
@@ -232,6 +238,28 @@ Aktiviere das Plugin projektlokal:
 	}
 }
 ```
+
+Sollen alle installierten Plugins in jedem Projekt der Sandbox gelten, nimm
+stattdessen `SHARE_ALL=1` im Profil — dann erzeugt jedes `up` diese Liste selbst,
+in `~/.claude/settings.json` der Sandbox.
+
+Der Inhalt eines Plugins ist übrigens live gemountet, nur read-only: `/plugin
+update` scheitert deshalb in der Sandbox. Aktualisiere auf dem Host, die neue
+Version ist sofort drin.
+
+---
+
+## MCP-Server fehlt in der Sandbox
+
+Prüfe in der Claude-Session mit `/mcp`, was überhaupt verbunden ist. Dann der
+Reihe nach:
+
+| Symptom                        | Ursache und Abhilfe                                              |
+| ------------------------------ | ---------------------------------------------------------------- |
+| Server taucht gar nicht auf    | nicht registriert: `.mcp.json`, `MCP_CONFIG` oder `sbx mcp load` |
+| Server startet, liefert nichts | Ziel-Host fehlt in der Policy: `./devbox.sh allow <host>`        |
+| `sbx mcp load` schlägt fehl    | erst `sbx mcp add …`, dann `sbx mcp ls` prüfen                   |
+| Server aus einem Plugin fehlt  | Plugin nicht aktiviert — siehe den Abschnitt darüber             |
 
 ---
 

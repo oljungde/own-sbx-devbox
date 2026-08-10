@@ -15,6 +15,17 @@
 #                Ein ":ro" am Ende macht einen Ordner schreibgeschützt.
 #   EXTRA_HOSTS  Zusätzliche Netzwerk-Hosts über die Grundliste hinaus (optional).
 #
+# Optional dazu — der Bequemlichkeitsmodus. Standard ist überall "aus":
+#
+#   SHARE_ALL    1 = globale Skills in den geteilten sbx-Store kopieren UND alle
+#                installierten Plugins in der Sandbox aktivieren. Bequem, aber
+#                eine bewusste Entscheidung — die Begründung steht unten beim
+#                Profil "alles".
+#   MCP_SERVERS  Bei `sbx mcp add` registrierte Server, die beim Start in die
+#                Sandbox geladen werden. Namen zeigt `sbx mcp ls`.
+#   MCP_CONFIG   Pfad zu einer Datei im Format von .mcp.json. Ihre "mcpServers"
+#                gelten dann in der Sandbox für alle Projekte.
+#
 # ⚠️  Merksatz: Workspaces lassen sich NUR beim Anlegen der Sandbox festlegen.
 #     Ein Ordner, der hier fehlt, kann später nicht nachgerüstet werden — dafür
 #     müsstest du die Sandbox entfernen und neu anlegen.
@@ -47,9 +58,50 @@ case "$DEVBOX_PROFILE" in
     )
     ;;
 
+  # --- Beispiel: alles sofort dabei ------------------------------------------
+  #
+  # Für den Fall, dass auf dieser Maschine NUR deine eigenen Sandboxes laufen
+  # und du beim Anlegen sofort deine gewohnte Umgebung willst: Skills, Plugins
+  # und MCP-Server ohne Nacharbeit.
+  #
+  # ⚠️  Was du damit aufgibst — lies das einmal, bevor du es abschreibst:
+  #
+  #     SHARE_ALL kopiert deine globalen Skills in den Skill-Store von sbx. Der
+  #     ist read-write und wird von ALLEN Sandboxes dieser Maschine geteilt,
+  #     auch von denen, die zu ganz anderen Setups gehören. Auf einem Rechner
+  #     mit nur deinen eigenen Sandboxes ist das genau die gewünschte
+  #     Bequemlichkeit. Auf einem geteilten Rechner ist es ein Seitenkanal.
+  #
+  #     Außerdem entsteht in der Sandbox eine ~/.claude/settings.json, die alle
+  #     installierten Plugins aktiviert. Sie enthält NUR "enabledPlugins" — die
+  #     settings.json des Hosts wird weiterhin nicht gemountet.
+  #
+  # Beides ist eine Kopie, kein Mount: Neue Skills und Plugins vom Host sind
+  # erst nach dem nächsten `up` in der Sandbox.
+  alles)
+    NAME="alles"
+    WORKSPACES=(
+      "$HOME/dev/own"
+    )
+    EXTRA_HOSTS=(
+      'mcp.context7.com'          # jeder MCP-Server braucht seinen Host
+    )
+
+    SHARE_ALL=1
+
+    # Vorher einmal auf dem Host registrieren und anmelden:
+    #   sbx mcp add linear --url https://mcp.linear.app/mcp
+    #   sbx mcp auth linear
+    MCP_SERVERS=()
+
+    # Eigene Server, die keine OAuth-Anmeldung brauchen — Format wie .mcp.json:
+    #   { "mcpServers": { "context7": { "command": "npx", "args": [...] } } }
+    MCP_CONFIG="$HOME/.config/devbox/mcp.json"
+    ;;
+
   *)
     echo "Unbekanntes Profil: '$DEVBOX_PROFILE'" >&2
-    echo "Bekannte Profile in dieser Datei: privat, lernen" >&2
+    echo "Bekannte Profile in dieser Datei: privat, lernen, alles" >&2
     exit 1
     ;;
 esac

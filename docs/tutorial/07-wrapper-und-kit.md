@@ -104,6 +104,14 @@ privat)
   ;;
 ```
 
+Drei weitere sind optional und standardmäßig aus — `SHARE_ALL`, `MCP_SERVERS`
+und `MCP_CONFIG`. Sie nehmen die Trennungen aus
+[Kapitel 6](06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet)
+zurück und bringen Skills, Plugins und MCP-Server gleich beim Anlegen mit. Warum
+das ein Profil-Schalter ist und keine Voreinstellung: Es ist eine Entscheidung
+über die Grenze zu **fremden** Sandboxes, und die kann nur treffen, wer seine
+Maschine kennt.
+
 Damit:
 
 ```bash

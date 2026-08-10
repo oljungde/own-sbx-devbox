@@ -89,6 +89,11 @@ way to understand what `sbx` actually does — every section is commented.
   another `sbx` setup on the same machine is left untouched.
 - Mount a **parent directory**, not individual projects: workspaces can only be
   set when the sandbox is created, so anything missing later costs a rebuild.
+- Global skills are mounted read-only but not linked, because `sbx` keeps its own
+  machine-wide store at that path. If your machine only runs your own sandboxes,
+  `SHARE_ALL=1` in a profile opts out of that separation and also enables every
+  installed plugin. It is off by default — see
+  [`docs/architektur.md`](docs/architektur.md).
 
 ## License
 

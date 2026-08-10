@@ -74,6 +74,175 @@ Mehr braucht der Alltag nicht.
 
 ---
 
+## Globales mitnehmen: Skills, Agents, Plugins, MCP
+
+Der Wrapper hängt fünf Ordner aus `~/.claude` **read-only** in die Sandbox
+(`CLAUDE_SHARED` in [devbox.sh](../devbox/devbox.sh#L47)). Vier davon werden
+zusätzlich nach `/home/agent/.claude/` verlinkt — `skills` nicht, dort sitzt
+schon der eigene Store von `sbx`.
+
+| Was                    | Zustand in der Sandbox              | Was du tun musst                                    |
+| ---------------------- | ----------------------------------- | --------------------------------------------------- |
+| `agents`               | ✓ verlinkt, wird gefunden           | nichts                                              |
+| `commands` (`/…`)      | ✓ verlinkt, wird gefunden           | nichts                                              |
+| `rules`                | ✓ verlinkt, wird gefunden           | nichts                                              |
+| `plugins`              | Ordner da, aber **nicht aktiviert** | projektlokal in `.claude/settings.json` einschalten |
+| `skills`               | nur unter dem **Host-Pfad** lesbar  | in `.claude/skills/` des Projekts kopieren          |
+| MCP-Server             | kommen **nicht** mit                | `.mcp.json` im Projekt oder `sbx mcp`               |
+| `settings.json`, Login | bewusst nicht gemountet             | —                                                   |
+
+Was mit Häkchen dasteht, setzt jedes `devbox up` neu. Nachsehen:
+
+```bash
+./devbox/devbox.sh shell privat
+ls -la ~/.claude        # agents, commands, rules, plugins als Symlinks
+```
+
+Die drei unteren Zeilen kannst du dir sparen — mit einer bewussten Entscheidung:
+[Alles sofort dabei](#alles-sofort-dabei-share_all).
+
+### Skills
+
+Sie liegen in der Sandbox unter ihrem **Host-Pfad**, nicht unter `~/.claude`:
+
+```bash
+ls /Users/DEINNAME/.claude/skills        # Linux/WSL: /home/DEINNAME/...
+```
+
+Den gewünschten Skill ins Projekt kopieren — dort findet Claude ihn zuverlässig,
+und er ist nebenbei versioniert und im Team geteilt:
+
+```bash
+mkdir -p .claude/skills
+cp -r /Users/DEINNAME/.claude/skills/mein-skill .claude/skills/
+```
+
+Warum nicht einfach verlinken: [architektur.md](architektur.md#der-sonderfall-skills).
+
+Gilt **nur für eigene** Skills unter `~/.claude/skills`. Skills aus einem Plugin
+nehmen einen anderen Weg — siehe gleich.
+
+### Plugins
+
+Der Ordner bringt die Registrierung mit (`installed_plugins.json`) und auch die
+Marktplätze (`known_marketplaces.json`), nicht aber die _Aktivierung_ — die steht
+in `settings.json`, und die mounten wir nicht. Mehr fehlt nicht:
+
+```json
+// <projekt>/.claude/settings.json
+{
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true
+  }
+}
+```
+
+Danach Claude in der Sandbox neu starten — `settings.json` wird beim Start
+gelesen. Willst du das Plugin in **allen** Projekten einer Sandbox, lege dieselbe
+Datei dort als `~/.claude/settings.json` an: ein echter Container-Pfad,
+überlebt Neustarts, stirbt mit `rm`.
+
+**Plugin-Skills umgehen den `skills`-Sonderfall.** Sie liegen nicht in
+`~/.claude/skills`, sondern im Plugin selbst — also unter
+`~/.claude/plugins/cache/<markt>/<plugin>/<version>/skills/`. Und `plugins` wird
+verlinkt. Kopieren musst du hier deshalb nichts:
+
+```bash
+# in der Sandbox — der Inhalt ist schon da
+ls ~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills
+```
+
+Aufgerufen werden sie mit dem Plugin als Präfix, z.B.
+`/mattpocock-skills:code-review`.
+
+> ⚠️ Der Mount ist **read-only**: `/plugin update` scheitert in der Sandbox.
+> Aktualisiere auf dem Host — weil live gemountet und nicht kopiert wird, ist die
+> neue Version sofort in der Sandbox, ohne Template-Neubau.
+
+Bringt ein Plugin einen MCP-Server mit, gilt zusätzlich der nächste Abschnitt.
+
+### MCP-Server
+
+Deine Host-Registrierung kommt nicht mit. Zwei Wege:
+
+**① `.mcp.json` im Projekt** — der Standardweg, versionierbar:
+
+```json
+{
+  "mcpServers": {
+    "context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }
+  }
+}
+```
+
+Dazu den Host freigeben, den der Server anspricht — sonst startet er und kommt
+nicht raus:
+
+```bash
+./devbox/devbox.sh allow 'mcp.context7.com' privat
+```
+
+**② `sbx mcp` für Dienste mit OAuth** (Atlassian, Linear, Notion …). Der Server
+läuft dann **außerhalb** der Sandbox, die Anmeldung passiert auf dem Host:
+
+```bash
+sbx mcp add linear --url https://mcp.linear.app/mcp
+sbx mcp auth linear
+sbx mcp load linear --sandbox devbox-privat
+sbx mcp ls                               # was ist registriert
+```
+
+In der Claude-Session prüfen: `/mcp` listet die verbundenen Server.
+
+### Alles sofort dabei (`SHARE_ALL`)
+
+Wenn auf deiner Maschine **nur deine eigenen** Sandboxes laufen, ist die
+Trennung oben Aufwand ohne Gegenwert. Drei Profil-Variablen nehmen sie zurück:
+
+```bash
+alles)
+  NAME="alles"
+  WORKSPACES=( "$HOME/dev/own" )
+  EXTRA_HOSTS=( 'mcp.context7.com' )      # jeder MCP-Server braucht seinen Host
+
+  SHARE_ALL=1                             # Skills kopieren + alle Plugins an
+  MCP_SERVERS=( linear )                  # vorher: sbx mcp add/auth
+  MCP_CONFIG="$HOME/.config/devbox/mcp.json"
+  ;;
+```
+
+Was `devbox up alles` dann zusätzlich tut:
+
+| Variable      | Was beim Start passiert                                  |
+| ------------- | -------------------------------------------------------- |
+| `SHARE_ALL=1` | Skills → sbx-Store; alle installierten Plugins aktiviert |
+| `MCP_SERVERS` | `sbx mcp load <name> --sandbox devbox-alles` je Eintrag  |
+| `MCP_CONFIG`  | `mcpServers` der Datei → `~/.claude.json` der Sandbox    |
+
+Für die Plugins entsteht dabei eine `~/.claude/settings.json` **in** der Sandbox,
+die jedes Plugin aus `installed_plugins.json` einschaltet. Alles davon ist
+idempotent — jedes `up` zieht es neu nach.
+
+> ⚠️ **Was du dabei aufgibst.** Der Skill-Store von `sbx` ist read-write und
+> wird von **allen** Sandboxes dieser Maschine geteilt, auch von fremden. Auf
+> deinem eigenen Rechner ist das die gewünschte Bequemlichkeit; auf einem
+> geteilten Rechner ist es ein Seitenkanal zwischen Sandboxes. Deshalb ist
+> `SHARE_ALL` standardmäßig **aus**.
+
+Zwei Dinge bleiben auch mit `SHARE_ALL` so, wie sie sind:
+
+- **Die `settings.json` des Hosts wird weiter nicht gemountet.** Die Datei in
+  der Sandbox wird erzeugt und enthält nur `enabledPlugins` — Host-Berechtigungen
+  wandern nicht in den Container.
+- **Kopie, kein Mount.** Ein neuer Skill oder ein neues Plugin auf dem Host ist
+  erst nach dem nächsten `up` in der Sandbox. Plugin-_Inhalte_ sind weiterhin
+  live gemountet, nur ihre Aktivierungsliste wird beim Start geschrieben.
+
+Die lange Fassung mit den Begründungen:
+[Kapitel 6](tutorial/06-globale-und-lokale-config.md).
+
+---
+
 ## Wenn sich dieses Repo geändert hat
 
 Nach einem `git pull` im devbox-Repo:
@@ -124,7 +293,9 @@ Neue nicht sofort, kannst du `rm`/`up` aufschieben — `status` erinnert dich.
 | `./devbox.sh allow <host> [profil]` | einen Host freigeben (nur diese Sandbox)                      | `sbx policy allow network --sandbox <name> <host>`      |
 | `./devbox.sh rm [profil]`           | Sandbox entfernen, fragt vorher nach                          | `sbx rm --force <name>`                                 |
 
-Ohne Profilangabe gilt immer `privat`.
+Ohne Profilangabe gilt immer `privat`. Setzt das Profil `SHARE_ALL` oder
+`MCP_SERVERS`/`MCP_CONFIG`, erledigt `up` zusätzlich Skills, Plugins und
+MCP-Server — siehe [Alles sofort dabei](#alles-sofort-dabei-share_all).
 
 **`doctor` oder `status`?** `doctor` fragt „ist mein Host richtig eingerichtet?",
 `status` fragt „was läuft gerade?".
@@ -203,6 +374,10 @@ privat)
   EXTRA_HOSTS=()
   ;;
 ```
+
+Drei optionale Variablen kommen dazu, alle standardmäßig aus: `SHARE_ALL`,
+`MCP_SERVERS`, `MCP_CONFIG` — siehe
+[Alles sofort dabei](#alles-sofort-dabei-share_all).
 
 > ⚠️ **Workspaces gehen nur beim Anlegen.** Ein Ordner, der beim `sbx create`
 > fehlte, lässt sich später nicht nachrüsten — nur über `rm` und neu anlegen

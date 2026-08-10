@@ -102,6 +102,30 @@ und im Team geteilt ist.
 Ein `--no-share-skills`-Flag erwähnt zwar `sbx skills --help`, es existiert in
 v0.38.0 aber weder bei `sbx create` noch bei `sbx run`.
 
+### Die Ausnahme: `SHARE_ALL`
+
+Jede der Trennungen oben hat genau eine Begründung: **fremde Sandboxes auf
+derselben Maschine**. Fällt dieses Gegenüber weg — weil dort nur die eigenen
+Sandboxes laufen — verteidigen sie nichts mehr und kosten nur noch Nacharbeit.
+
+Deshalb gibt es `SHARE_ALL=1` als Profil-Variable. Sie kopiert die globalen
+Skills in den geteilten Store und aktiviert alle installierten Plugins über eine
+`settings.json`, die der Wrapper **in** der Sandbox erzeugt.
+
+Drei Entscheidungen dazu:
+
+- **Standard ist aus.** Wer nichts einträgt, bekommt die getrennte Variante. Der
+  Schalter soll eine Entscheidung sein, kein Zustand, in den man hineinrutscht.
+- **Im Profil, nicht im Skript.** Ob die Grenze zu anderen Sandboxes gebraucht
+  wird, hängt an der Maschine, nicht am Wrapper. Diese Frage kann nur der
+  beantworten, der den Rechner kennt.
+- **Die Host-`settings.json` bleibt trotzdem draußen.** Die erzeugte Datei
+  enthält nur `enabledPlugins`. Diese eine Trennung kostet nichts, also geben
+  wir sie auch im Bequemlichkeitsmodus nicht auf.
+
+Der Preis steht in [Kapitel 6](tutorial/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet):
+geteilter, beschreibbarer Store und Kopie statt Live-Mount.
+
 **Warum `:ro` und nicht `~/.claude` komplett?**
 
 - `.credentials.json` hat in einem Container nichts verloren.

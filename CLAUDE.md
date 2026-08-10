@@ -12,6 +12,11 @@ Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
   liegt bewusst separat unter `devbox/kit/`.
 - **Netzregeln immer mit `--sandbox`**, nie global. Auf derselben Maschine kann
   ein anderes Sandbox-Setup laufen, das nicht verändert werden darf.
+- **`SHARE_ALL` bleibt standardmäßig aus.** Der Schalter nimmt genau die
+  Trennungen zurück, die Kapitel 6 begründet — das darf eine bewusste
+  Profil-Entscheidung sein, nie eine Voreinstellung. Er nutzt bewusst `cp` +
+  `sbx exec` statt des EXPERIMENTAL-Kommandos `sbx skills import`. `sbx mcp` ist
+  dagegen nicht als experimentell markiert und darf verwendet werden.
 - **Nichts `sbx/` nennen.** Fremde Wrapper erkennen diesen Ordnernamen im
   Git-Root automatisch und kapern sonst dieses Repo.
 - Ändert sich das Verhalten, muss das passende Tutorial-Kapitel unter
