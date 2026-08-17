@@ -3,17 +3,27 @@
 Dieses Repo baut Claude-Sandboxes auf Basis von Docker Sandboxes (`sbx`).
 Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
 
-Es gibt **zwei Varianten**, die sich nichts teilen und nebeneinander laufen:
+Es gibt **drei Varianten**, die sich nichts teilen und nebeneinander laufen:
 
-| | `devbox/` (Variante 1) | `solobox/` (Variante 2) |
-| --- | --- | --- |
-| Sandboxes | eine pro Profil | genau eine, systemweit |
-| Aufruf | `./devbox/devbox.sh up privat` | `solobox up` im Projektordner |
-| Conf | Pflicht | optional |
-| Globales aus `~/.claude` | über `SHARE_ALL` zuschaltbar | immer, inkl. Hooks und Plugins |
+| | `devbox/` (Variante 1) | `solobox/` (Variante 2) | `v3/` (Variante 3) |
+| --- | --- | --- | --- |
+| Sandboxes | eine pro Profil | genau eine, systemweit | eine pro Projekt, ein Image |
+| Aufruf | `./devbox/devbox.sh up privat` | `solobox up` im Projektordner | `sbx-claude up` im Projektordner |
+| Conf | Pflicht | optional | optional |
+| Globales aus `~/.claude` | über `SHARE_ALL` zuschaltbar | immer, inkl. Hooks und Plugins | immer; Hooks werden **ersetzt** |
+| Berechtigungen | Image-Standard | `acceptEdits` | `bypassPermissions` + `ask` auf git |
+| Benachrichtigung | unterdrückt | unterdrückt | funktioniert (Host-Wächter) |
 
 Änderst du eine Variante, ist die andere **nicht** automatisch betroffen — aber
-prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
+prüfe, ob die Begründung in `docs/architektur.md` bzw. `v3/docs/architektur.md`
+noch stimmt.
+
+⚠️ **Eine Ausnahme von dieser Regel gibt es doch, und sie ist bekannt:** `v3/`
+benutzt `sbx skills import`, und das verlangt `feature.shareSkills` — eine
+**maschinenweite** sbx-Einstellung. Ist sie an, hängt jede Sandbox auf dem
+Rechner den geteilten, read-write Skill-Store ein, auch `solobox`, deren
+`copy_skills` dann in den Store schreibt statt in einen Sandbox-Ordner. Steht in
+`v3/docs/architektur.md`. Wer daran arbeitet, muss beide Varianten prüfen.
 
 ## Wichtig beim Arbeiten an diesem Repo
 
@@ -74,6 +84,54 @@ prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
   nachgemessen, das Testpaket ging durch. Es müssen Shims im `PATH` sein, wie in
   `devbox/Dockerfile`. Schalter heißt hier `SOLOBOX_SAFE_CHAIN`.
 
+## Zusätzlich für `v3/`
+
+Die Fallen aus `solobox/` gelten hier alle mit (Shell-Prüfung, Symlink-Auflösung,
+Stempelblock am Ende, `pruefe_stand` nie in einer Pipe, Safe Chain als Shims —
+der Schalter heißt hier `SBX_CLAUDE_SAFE_CHAIN`). Dazu kommen sieben Regeln, die
+nur hier gelten:
+
+- **`sbx run` wird NIE benutzt, auch nicht beim ersten Start.** Es startet den
+  Agenten mit `--dangerously-skip-permissions`. Bei einer Sandbox pro Projekt
+  wäre das nicht die Ausnahme, sondern bei jedem neuen Projekt der Fall — der
+  ganze Berechtigungsmodus wäre wirkungslos. Der Weg ist immer
+  `sbx exec -it -w PFAD SANDBOX claude`; `/login` funktioniert darin.
+- **Der Wächter übernimmt keinen Text aus dem Container.** Der Ereignisordner ist
+  ein read-write Kanal aus der Sandbox auf den Host. Erlaubt sind genau ein Wort
+  aus einer festen Liste und eine per Regex geprüfte Zahl; den Meldungstext
+  formuliert `watch.sh` selbst, und `terminal-notifier` bekommt Argumente, nie
+  eine Shell-Zeile. Wer hier Freitext durchlässt, baut AppleScript-Injection auf
+  den Mac. Auch die Dateinamen werden geprüft, und die Leseposition liegt
+  **ausserhalb** des Ereignisordners.
+- **`notify.sh` gehört ins Image, nicht in einen Mount.** Ein Hook muss auch
+  funktionieren, wenn vom Host nichts erreichbar ist. Was nicht ins Image kann —
+  Ereignispfad, Sandbox-Name, Schwelle — bekommt er als **Argumente** aus der
+  abgeleiteten `settings.json`. Es gab dafür einmal eine eigene Umgebungsdatei in
+  der Sandbox; die war ein Umweg mit einem zusätzlichen Fehlerfall.
+- **Es gibt keinen git-Hook mehr, und das ist eine Messung.** Nachgemessen mit
+  `deny`-Regeln: Claude Code wendet Regeln auf **jedes Segment** einer Kette an
+  und auch **in Command-Substitution**. `cd repo && git push` und `x=$(git push)`
+  lösen die git-Regeln also von selbst aus. Der frühere `git-guard.sh` (133
+  Zeilen Regex) deckte damit nur noch `bash -c "git push"` ab — dafür stehen
+  jetzt `Bash(bash -c *)`, `Bash(sh -c *)` und `Bash(zsh -c *)` in `EXTRA_ASK`.
+  Bewusst aufgegeben: Shell-Umleitungen nach `.git/` fragen nicht mehr.
+- **Die ask-Muster heißen `Bash(git *VERB*)`, nicht `Bash(git VERB *)`.** Sonst
+  rutscht `git -C unterordner commit` durch. Und `deny` auf `.git/**` ist Pflicht:
+  `bypassPermissions` schaltet laut Doku ausgerechnet den Schutz der „protected
+  paths" ab.
+- **Der `sandbox`-Block der Host-`settings.json` wird nicht übernommen.** Seine
+  Pfade zeigen im Container ins Leere und sähen dabei aus, als schützten sie
+  etwas. `HOOK_UEBERNEHMEN` bleibt eine Liste, keine Heuristik — und die drei
+  Ereignisse des Rückkanals (`UserPromptSubmit`, `Stop`, `Notification`) stehen
+  nicht darin, weil v3 sie selbst besetzt.
+- **`feature.shareSkills` wird nie still gesetzt.** Es wirkt maschinenweit (siehe
+  Warnung oben). `up` fragt einmal, `doctor` benennt den Zustand,
+  `ISOLATE_SKILLS=1` ist der Ausschalter pro Projekt.
+
+Und weiterhin: **`gewuenschte_mounts()` ist die einzige Mount-Liste**, jetzt
+zusätzlich mit dem Ereignisordner darin. Eine zweite Liste bricht den
+Drift-Check.
+
 ## Aufbau
 
 | Pfad                           | Inhalt                                          |
@@ -85,12 +143,21 @@ prüfe, ob die Begründung in `docs/architektur.md` für beide noch stimmt.
 | `solobox/Dockerfile`           | Toolchain des Images (Variante 2)               |
 | `solobox/solobox.sh`           | Wrapper für die eine Sandbox                    |
 | `solobox/solobox.conf.example` | Konfigurationsvorlage (optional)                |
+| `v3/Dockerfile`                | Toolchain des Images (Variante 3), voll ausgestattet |
+| `v3/sbx-claude.sh`             | Wrapper: eine Sandbox pro Projekt               |
+| `v3/sbx-claude.conf.example`   | Konfigurationsvorlage (optional)                |
+| `v3/hooks/notify.sh`           | läuft IM Container: Ereigniszeile + Glocke      |
+| `v3/hooks/watch.sh`            | läuft auf dem HOST: Ereignis → Meldung          |
 | `docs/tutorial/`               | Tutorial Variante 1: Kapitel 0 plus sieben      |
 | `docs/tutorial-solo/`          | Tutorial Variante 2: sieben Kapitel             |
+| `v3/docs/tutorial/`            | Tutorial Variante 3: Kapitel 0 bis 8            |
 | `docs/cheatsheet.md`           | alle Kommandos von Variante 1                   |
 | `docs/cheatsheet-solo.md`      | alle Kommandos von Variante 2                   |
-| `docs/architektur.md`          | die Begründungen (beide Varianten)              |
-| `docs/troubleshooting.md`      | Fehlersuche (beide Varianten)                   |
+| `v3/docs/cheatsheet.md`        | alle Kommandos von Variante 3                   |
+| `docs/architektur.md`          | die Begründungen (Varianten 1 und 2)            |
+| `v3/docs/architektur.md`       | die Begründungen (Variante 3)                   |
+| `docs/troubleshooting.md`      | Fehlersuche (Varianten 1 und 2)                 |
+| `v3/docs/troubleshooting.md`   | Fehlersuche (Variante 3)                        |
 | `scripts/check-links.sh`       | prüft relative Links in der Doku                |
 | `.github/workflows/ci.yml`     | shellcheck + Linkprüfung                        |
 
@@ -100,10 +167,33 @@ Genau das, was die CI prüft:
 
 ```bash
 shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
+shellcheck v3/sbx-claude.sh v3/hooks/notify.sh v3/hooks/watch.sh
 bash -n devbox/devbox.conf.example
 bash -n solobox/solobox.conf.example
+bash -n v3/sbx-claude.conf.example
 test -x devbox/devbox.sh && test -x solobox/solobox.sh
+test -x v3/sbx-claude.sh && test -x v3/hooks/watch.sh
 ./scripts/check-links.sh
+```
+
+Der Container-Hook von v3 ist ohne Sandbox prüfbar. Das gehört mit zur Abnahme,
+weil eine ungeprüfte Zusage eine Vermutung ist:
+
+```bash
+ORDNER="$(mktemp -d)"
+printf '%s' '{"session_id":"t1"}' | sh v3/hooks/notify.sh start "$ORDNER" sbx-claude-t 60
+echo $(( $(date +%s) - 142 )) > "${TMPDIR:-/tmp}/sbx-claude-start-t1"
+printf '%s' '{"session_id":"t1"}' | sh v3/hooks/notify.sh stop  "$ORDNER" sbx-claude-t 60
+cat "$ORDNER/sbx-claude-t.ereignisse"     # erwartet: "fertig<TAB>142"
+```
+
+Und der Wächter muss einen bösartigen Sandbox-Namen abweisen, statt ihn in eine
+Meldung zu übernehmen — das ist die Vertrauensgrenze zum Mac:
+
+```bash
+printf '%s' '{"session_id":"t1"}' \
+  | sh v3/hooks/notify.sh wartet "$ORDNER" 'x"; touch /tmp/BOESE; "' 60
+ls "$ORDNER"     # erwartet: nur sbx-claude-t.ereignisse, keine zweite Datei
 ```
 
 Kein `shellcheck` zur Hand:
@@ -118,12 +208,18 @@ docker run --rm devbox/base:latest bash -lc 'python --version; pnpm --version'
 # Variante 2
 ./solobox/solobox.sh update
 docker run --rm solobox/base:latest bash -lc 'python --version; pnpm --version; gcc --version | head -1'
+
+# Variante 3
+./v3/sbx-claude.sh update
+docker run --rm sbx-claude/base:latest bash -lc 'python --version; python3.10 --version; python3.14 --version; pnpm --version; gcc --version | head -1; gh --version; ruff --version; ls -l /usr/local/bin/sbx-claude-notify'
 ```
 
 `pnpm --version` darf **keine** Corepack-Download-Meldung zeigen.
 
 `update` statt `build --force`: Es sagt zusätzlich, welche bestehenden Sandboxes
-das neue Template noch nicht haben — die erreicht ein Neubau nämlich nicht.
+das neue Template noch nicht haben — die erreicht ein Neubau nämlich nicht. In
+Variante 3 ist das kein Randfall, sondern der Regelfall: dort gibt es eine
+Sandbox pro Projekt, und jede einzelne braucht `rm` + `up` + `/login`.
 
 ## Fallen in `devbox.sh`
 

@@ -1,5 +1,13 @@
-# Lokale, maschinenspezifische Konfiguration (aus devbox.conf.example ableiten)
+# Lokale, maschinenspezifische Konfiguration (aus den .example-Dateien ableiten).
+# Die echten Dateien liegen normalerweise unter ~/.config/<variante>/ — diese
+# Einträge fangen den Fall, dass jemand sie zum Ausprobieren ins Repo legt.
 devbox.conf
+solobox.conf
+sbx-claude.conf
+
+# Projektlokale Netz-Freigaben von v3. Gehören ins jeweilige Projekt, nicht
+# hierher — und wenn doch, dann nicht in die Historie.
+.sbx-claude-hosts
 
 # Temporäre Build-Artefakte
 *.tar

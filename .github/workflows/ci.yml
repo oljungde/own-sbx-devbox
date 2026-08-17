@@ -36,8 +36,16 @@ jobs:
       - uses: actions/checkout@v4
 
       # shellcheck ist auf den ubuntu-Runnern vorinstalliert.
+      #
+      # Die Hooks von v3 gehören mit hinein, obwohl sie klein sind: notify.sh
+      # läuft IM Container als Hook, und ein Fehler darin fällt dort nicht als
+      # Skriptfehler auf, sondern als "die Benachrichtigung kommt nicht".
+      # watch.sh läuft auf dem Host und trägt die Vertrauensgrenze zwischen
+      # Sandbox und Mac.
       - name: Shell-Skripte prüfen
-        run: shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
+        run: |
+          shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
+          shellcheck v3/sbx-claude.sh v3/hooks/notify.sh v3/hooks/watch.sh
 
       # Die Profilvorlage wird von devbox.sh per `source` gelesen. Ein
       # Syntaxfehler darin würde also erst beim Start auffallen — und dort wie
@@ -48,12 +56,22 @@ jobs:
         run: |
           bash -n devbox/devbox.conf.example
           bash -n solobox/solobox.conf.example
+          bash -n v3/sbx-claude.conf.example
 
-      # Beide Wrapper werden über einen Symlink bzw. direkt aufgerufen — ohne
+      # Alle Wrapper werden über einen Symlink bzw. direkt aufgerufen — ohne
       # Ausführbar-Bit scheitert das mit "permission denied", und zwar erst beim
       # Nutzer.
+      #
+      # Bei v3 gilt das auch für watch.sh: der LaunchAgent startet die Datei
+      # direkt, und ohne Bit meldet launchd nur "läuft nicht" — ohne zu sagen,
+      # warum. notify.sh setzt das Dockerfile ohnehin per `chmod a+rx`, es
+      # braucht das Bit im Repo also nicht.
       - name: Wrapper sind ausführbar
-        run: test -x devbox/devbox.sh && test -x solobox/solobox.sh
+        run: |
+          test -x devbox/devbox.sh
+          test -x solobox/solobox.sh
+          test -x v3/sbx-claude.sh
+          test -x v3/hooks/watch.sh
 
       - name: Links in der Doku prüfen
         run: ./scripts/check-links.sh

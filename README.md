@@ -12,6 +12,10 @@ mounted in read-only instead of copied into every repository.
 
 ## What you get
 
+The toolchain below describes `devbox/` (variant 1). `solobox/` and `v3/` ship
+their own Dockerfiles with the same core plus per-variant additions — see
+[Three variants](#three-variants).
+
 - **Python 3.10, 3.12 and 3.14** side by side (3.12 is the default; `uv` picks
   the right one per project from `.python-version`)
 - `uv`, `pip`, `poetry`, `ruff`
@@ -58,19 +62,21 @@ rewrites paths to `/c/Users/...`, which surprises `sbx create` mount arguments.
 See [`docs/tutorial/`](docs/tutorial/) for the full walkthrough and
 [`docs/cheatsheet.md`](docs/cheatsheet.md) for every command on one page.
 
-## Two variants
+## Three variants
 
-This repository ships **two** takes on the same idea. They share nothing but the
-`sbx` concepts underneath, and they can run side by side on one machine.
+This repository ships **three** takes on the same idea. They share nothing but
+the `sbx` concepts underneath, and they can run side by side on one machine.
 
-|                        | `devbox/` (variant 1)          | `solobox/` (variant 2)              |
-| ---------------------- | ------------------------------ | ----------------------------------- |
-| Sandboxes              | one per profile                | exactly one, machine-wide           |
-| Invocation             | `./devbox/devbox.sh up privat` | `solobox up`, from inside a project |
-| Config file            | required                       | optional                            |
-| Global skills / agents | opt-in per profile             | always on                           |
-| Global hooks & plugins | only via `SHARE_ALL`           | always on, filtered                 |
-| Claude starts in       | the primary workspace          | your current project directory      |
+|                        | `devbox/` (variant 1)          | `solobox/` (variant 2)              | `v3/` (variant 3)                    |
+| ---------------------- | ------------------------------ | ----------------------------------- | ------------------------------------ |
+| Sandboxes              | one per profile                | exactly one, machine-wide           | **one per project**, one shared image |
+| Invocation             | `./devbox/devbox.sh up privat` | `solobox up`, from inside a project | `sbx-claude up`, from inside a project |
+| Config file            | required                       | optional                            | optional                             |
+| Global skills / agents | opt-in per profile             | always on                           | always on (skills via `sbx skills`)  |
+| Global hooks & plugins | only via `SHARE_ALL`           | always on, filtered                 | plugins yes, hooks **replaced**      |
+| Claude starts in       | the primary workspace          | your current project directory      | your current project directory       |
+| Permission mode        | image default                  | `acceptEdits`                       | `bypassPermissions` **+ ask on git** |
+| Desktop notifications  | suppressed                     | suppressed                          | **works**, via a host watcher        |
 
 Variant 2 exists for the case where you want your entire global Claude setup —
 skills, agents, commands, rules, hooks, plugins — available in every project
@@ -84,6 +90,23 @@ chmod +x solobox/solobox.sh
 ./solobox/solobox.sh install     # symlink into ~/.local/bin
 cd ~/dev/own/some-project
 solobox up                       # builds, creates the sandbox, starts Claude here
+```
+
+Variant 3 moves the sandbox boundary onto the project boundary: every project
+gets its own sandbox, all built from one image. That buys two things the other
+two cannot offer — a completion notification that actually works inside a Linux
+container (an event file plus a host-side watcher, because the container can
+neither call macOS APIs nor reach the host), and permissions that never prompt
+except on git. It pays for them with one `/login` per project and with the fact
+that a rebuilt image never reaches existing sandboxes. Its documentation is
+self-contained under [`v3/docs/`](v3/docs/).
+
+```bash
+chmod +x v3/sbx-claude.sh v3/hooks/*.sh
+./v3/sbx-claude.sh install --watcher   # symlink + LaunchAgent for notifications
+./v3/sbx-claude.sh build               # one image for every project
+cd ~/dev/own/some-project
+sbx-claude up                          # creates this project's sandbox, starts Claude
 ```
 
 ## How it fits together
@@ -122,6 +145,11 @@ way to understand what `sbx` actually does — every section is commented.
   `SHARE_ALL=1` in a profile opts out of that separation and also enables every
   installed plugin. It is off by default — see
   [`docs/architektur.md`](docs/architektur.md).
+- Variant 3 treats the shared event directory as a **trust boundary in the other
+  direction**: it is a channel out of the sandbox onto the host, so the watcher
+  accepts exactly one word from a fixed list and one integer, composes the
+  notification text itself, and never passes container-supplied strings to a
+  shell or to AppleScript. See [`v3/docs/architektur.md`](v3/docs/architektur.md).
 
 ## License
 

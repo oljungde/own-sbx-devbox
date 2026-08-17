@@ -1,0 +1,117 @@
+# =============================================================================
+# sbx-claude — Konfiguration (OPTIONAL)
+#
+# Ohne diese Datei gelten die Standardwerte aus v3/sbx-claude.sh. `sbx-claude up`
+# funktioniert also unmittelbar nach dem Auschecken.
+#
+# Einrichten:
+#   mkdir -p ~/.config/sbx-claude
+#   cp v3/sbx-claude.conf.example ~/.config/sbx-claude/sbx-claude.conf
+#
+# Es ist ganz normales Bash. Kein Profil, kein `case` — anders als in Variante 1
+# gibt es hier nichts zu unterscheiden: das Projekt bestimmt die Sandbox, nicht
+# ein Profilname.
+#
+# Hier stehen die fünf Variablen, die man wirklich ändert. Es gibt noch fünf
+# weitere (GIT_ASK_VERBEN, EXTRA_ASK, HOOK_UEBERNEHMEN, CLAUDE_SHARED,
+# CLAUDE_LINKED) — die kann man hier genauso setzen, aber sie werden praktisch
+# nie angefasst, und ihre Begründung steht dort, wo sie hingehört: als Kommentar
+# im Kopf von v3/sbx-claude.sh. Diese Datei kurz zu halten ist Absicht.
+# =============================================================================
+
+# --- Netz: zusätzliche Hosts -------------------------------------------------
+#
+# Der eigentliche Zweck dieser Datei. Die Grundausstattung steht in
+# sbx-claude.sh als BASE_HOSTS (Anthropic, GitHub, npm, PyPI, astral, aikido,
+# Playwright, context7, atlassian, figma). Was hier dazukommt, gilt für ALLE
+# Projekte.
+#
+# Deny-by-default: was nicht freigegeben ist, geht nicht. Für einen einzelnen
+# Versuch reicht `sbx-claude allow <host>` — das gilt aber nur, bis die Sandbox
+# neu angelegt wird. Dauerhaft gehört der Host hierher.
+#
+# Drei Ebenen gibt es insgesamt:
+#   1. BASE_HOSTS        in sbx-claude.sh  (für alle, vom Repo vorgegeben)
+#   2. EXTRA_HOSTS       hier             (für alle, von dir)
+#   3. .sbx-claude-hosts im Projekt       (nur dieses Projekt, mit Rückfrage)
+#
+# EXTRA_HOSTS=(
+#   'packages.cloud.google.com'
+#   '*.googleapis.com'
+#   '*.sentry.io'
+# )
+
+# --- Benachrichtigung: ab wann "fertig" gemeldet wird -----------------------
+#
+# Der Stop-Hook feuert nach JEDER Antwort. Bei einem Dialog mit dreissig Runden
+# wären das dreissig Meldungen — und dann schaltet man sie ab, womit die
+# zuverlässige Benachrichtigung nichts mehr wert ist. Gemeldet wird deshalb nur,
+# was länger gedauert hat als diese Schwelle: der Fall "ich bin weggegangen".
+#
+# Unabhängig davon meldet sich jede Rückfrage sofort — auch jede
+# git-Bestätigung. Die Terminal-Glocke klingt immer.
+#
+# NOTIFY_SCHWELLE=60
+
+# --- Eigenständige MCP-Server ------------------------------------------------
+#
+# Hier stehen nur Namen von Servern, die auf dem HOST registriert sind. sbx
+# reicht sie über sein Gateway in die Sandbox; die Anmeldung passiert einmal
+# aussen.
+#
+#   sbx mcp add linear --url https://mcp.linear.app/mcp
+#   sbx mcp auth linear
+#   sbx mcp ls
+#
+# Server aus deinen PLUGINS gehören hier NICHT hinein (grepika, atlassian,
+# figma). Die startet Claude selbst im Container; sie brauchen nur die passenden
+# Netz-Freigaben.
+#
+# ⚠️  `sbx mcp add <name> --command …` gibt es auch — damit läuft der Server als
+#     Prozess auf dem HOST, aussen an der Sandbox vorbei. Das ist ein Loch in
+#     genau der Wand, die wir hier bauen. sbx-claude benutzt es nicht.
+#
+# MCP_SERVERS=(
+#   'linear'
+# )
+
+# --- Berechtigungsmodus ------------------------------------------------------
+#
+# Erlaubt: bypassPermissions (Standard), acceptEdits, default, plan
+#
+# Warum bypassPermissions vertretbar ist — aber nur zusammen mit den
+# git-Rückfragen: Die Rückfragen sitzen dort, wo etwas Unumkehrbares passiert,
+# und nicht bei jedem Datei-Edit. Laut Dokumentation gelten `ask`- und
+# `deny`-Regeln "in every mode, including bypassPermissions".
+#
+# ⚠️  Was bypassPermissions nicht wegnimmt, ist die Verantwortung: Der Workspace
+#     ist ein echter Bind-Mount. Der Container schützt dein SYSTEM, nicht dein
+#     REPO. `rm -rf` und `git push --force` treffen echte Dateien und echte
+#     Remotes. Wer das nicht will, nimmt acceptEdits — dann fragt zusätzlich
+#     jedes Bash-Kommando.
+#
+# PERMISSION_MODE="bypassPermissions"
+
+# --- Globale Skills: geteilter Store oder nicht -----------------------------
+#
+# 0 (Standard): Skills kommen aus sbx' eigenem Store (`sbx skills import`).
+# 1:            diese Sandbox hängt den Store nicht ein (`--no-share-skills`).
+#
+# ⚠️  Das ist das Sicherheitsventil dieser Variante, deshalb steht es hier und
+#     nicht nur im Skript. Zwei Dinge muss man dazu wissen:
+#
+#     Erstens hängt der Store am Feature-Flag `feature.shareSkills`, und das ist
+#     eine MASCHINENWEITE sbx-Einstellung. Ist es an, hängt JEDE Sandbox auf
+#     diesem Rechner den Store ein — auch fremde. `sbx-claude up` fragt einmal,
+#     bevor es das Flag setzt, und schaltet es niemals still um.
+#
+#     Zweitens ist der Store read-write und von allen geteilt. Bei einer Sandbox
+#     pro Projekt heisst das: der Agent in Projekt A könnte einen Skill
+#     verändern, den Projekt B morgen ausführt. Für Projekte, deren Code du
+#     nicht kennst, gehört ISOLATE_SKILLS auf 1.
+#
+#     `--no-share-skills` steht nicht in `sbx create --help` und gehört zum
+#     EXPERIMENTAL-Kommando `sbx skills`. Der Wrapper prüft vorher, ob die
+#     installierte sbx-Version es überhaupt kennt.
+#
+# ISOLATE_SKILLS=0
