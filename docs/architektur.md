@@ -47,7 +47,7 @@ was ein Kit kann und ein stabiles Kommando nicht.**
 | Startup-Kommandos     | `sbx exec -d`                        |
 
 Ein Kit ist also Bequemlichkeit, kein Ermöglicher. Es liegt als
-[`devbox/kit/kit.yaml`](../devbox/kit/kit.yaml) bei, damit man es kennenlernen
+[`v1/kit/kit.yaml`](../v1/kit/kit.yaml) bei, damit man es kennenlernen
 kann — aber nichts hängt davon ab.
 
 **Dasselbe gilt für `sbx skills`** (ebenfalls EXPERIMENTAL). Siehe unten.
@@ -137,7 +137,7 @@ Drei Entscheidungen dazu:
   enthält nur `enabledPlugins`. Diese eine Trennung kostet nichts, also geben
   wir sie auch im Bequemlichkeitsmodus nicht auf.
 
-Der Preis steht in [Kapitel 6](tutorial/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet):
+Der Preis steht in [Kapitel 6](tutorial-v1/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet):
 geteilter, beschreibbarer Store und Kopie statt Live-Mount.
 
 **Warum `:ro` und nicht `~/.claude` komplett?**
@@ -189,7 +189,7 @@ devbox ist so benannt, dass es sich mit keinem anderen `sbx`-Setup überschneide
 
 |                | devbox                  | Typische Alternative |
 | -------------- | ----------------------- | -------------------- |
-| Ordner im Repo | `devbox/`               | `sbx/`               |
+| Ordner im Repo | `v1/`                   | `sbx/`               |
 | Sandbox-Namen  | `devbox-*`              | `claude-*`           |
 | Template       | `devbox/base`           | agent-spezifisch     |
 | Zustand        | `~/.local/state/devbox` | anderswo             |
@@ -275,7 +275,7 @@ Arbeitsverzeichnis.
 Der Preis: `sbx exec` ist nicht der von `sbx` vorgesehene Weg, einen Agenten zu
 starten (`sbx run` ist es). Deshalb steht der Vergleich beider Startarten als
 ausdrücklicher Prüfschritt im
-[Tutorial-Kapitel 1](tutorial-solo/01-die-eine-sandbox.md), und der erste Start
+[Tutorial-Kapitel 1](tutorial-v2/01-die-eine-sandbox.md), und der erste Start
 nach dem Anlegen läuft über `sbx run` — dort passiert der Login.
 
 ### `settings.json`: ableiten statt mounten

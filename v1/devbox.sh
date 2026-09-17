@@ -13,7 +13,7 @@ set -euo pipefail
 # Bewusst NUR stabile sbx-Flags. `sbx kit` und `sbx skills` sind in v0.38 als
 # EXPERIMENTAL markiert ("may change or be removed in future releases") und
 # haben deshalb hier nichts zu suchen — die Kit-Variante liegt als Kür in
-# devbox/kit/kit.yaml.
+# v1/kit/kit.yaml.
 #
 # Aufruf:  ./devbox.sh <kommando> [profil]
 # =============================================================================

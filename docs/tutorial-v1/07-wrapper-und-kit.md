@@ -31,18 +31,18 @@ Wrapper da.
 
 ## Der Wrapper
 
-Lege [`devbox/devbox.sh`](../../devbox/devbox.sh) an. Gut ein Viertel der Datei
+Lege [`v1/devbox.sh`](../../v1/devbox.sh) an. Gut ein Viertel der Datei
 sind Kommentare — **lies sie einmal durch**, sie ist als Text gedacht.
 
 ```bash
-wc -l devbox/devbox.sh                    # Umfang
-grep -cE '^\s*#' devbox/devbox.sh         # davon Kommentarzeilen
+wc -l v1/devbox.sh                    # Umfang
+grep -cE '^\s*#' v1/devbox.sh         # davon Kommentarzeilen
 ```
 
 Ausführbar machen:
 
 ```bash
-chmod +x devbox/devbox.sh
+chmod +x v1/devbox.sh
 ```
 
 ## Die Kommandos
@@ -67,7 +67,7 @@ nicht verrät, aus welchem Template eine Sandbox entstanden ist, schreibt der
 Wrapper sich das beim Anlegen selbst auf — nach `~/.local/state/devbox/`:
 
 ```bash
-$ ./devbox/devbox.sh update
+$ ./v1/devbox.sh update
 >> baue Image 'devbox/base:latest' ...
 >> exportiere das Image (dauert bei mehreren GB einen Moment) ...
 >> lade das Image in den sbx-Template-Store ...
@@ -90,7 +90,7 @@ nicht versehentlich committet werden:
 
 ```bash
 mkdir -p ~/.config/devbox
-cp devbox/devbox.conf.example ~/.config/devbox/devbox.conf
+cp v1/devbox.conf.example ~/.config/devbox/devbox.conf
 $EDITOR ~/.config/devbox/devbox.conf
 ```
 
@@ -115,20 +115,20 @@ Maschine kennt.
 Damit:
 
 ```bash
-./devbox/devbox.sh doctor
-./devbox/devbox.sh build
-./devbox/devbox.sh up privat
+./v1/devbox.sh doctor
+./v1/devbox.sh build
+./v1/devbox.sh up privat
 ```
 
 ## Der letzte Schritt: von überall aufrufbar
 
-Bisher steht in allen Beispielen `./devbox/devbox.sh`. Das funktioniert nur,
+Bisher steht in allen Beispielen `./v1/devbox.sh`. Das funktioniert nur,
 solange du im Repo-Wurzelverzeichnis stehst — und dort stehst du im Alltag
 nie, sondern in einem Projektordner:
 
 ```bash
 cd ~/dev/own/projekt-x
-./devbox/devbox.sh up          # No such file or directory
+./v1/devbox.sh up          # No such file or directory
 ```
 
 Das Skript selbst ist darauf vorbereitet. Es sucht sein Dockerfile nicht im
@@ -144,7 +144,7 @@ Es ist also egal, von wo du es aufrufst — es fehlt nur ein kurzer Name.
 
 ```bash
 # macOS (zsh ist Standard) — Linux meist ~/.bashrc
-echo 'alias devbox="$HOME/dev/own/devbox/devbox/devbox.sh"' >> ~/.zshrc
+echo 'alias devbox="$HOME/dev/own/devbox/v1/devbox.sh"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -162,13 +162,13 @@ devbox up privat
 > `devbox up privat` wird zu `…/devbox.sh up privat`. In PowerShell gilt das
 > **nicht** — dort braucht es eine Funktion. Siehe
 > [Kapitel 0](00-vorbereitung.md#windows) und das
-> [Cheat Sheet](../cheatsheet.md#einen-alias-anlegen).
+> [Cheat Sheet](../cheatsheet-v1.md#einen-alias-anlegen).
 
 ### Oder ohne Shell-Datei: ein Symlink im PATH
 
 ```bash
 mkdir -p ~/.local/bin
-ln -sfn ~/dev/own/devbox/devbox/devbox.sh ~/.local/bin/devbox
+ln -sfn ~/dev/own/devbox/v1/devbox.sh ~/.local/bin/devbox
 ```
 
 Auf den meisten Linux-Distributionen ist `~/.local/bin` schon im `PATH`, auf
@@ -232,7 +232,7 @@ permissions:
 Anwenden:
 
 ```bash
-sbx create --kit ./devbox/kit/ --name devbox-kit claude ~/dev/own
+sbx create --kit ./v1/kit/ --name devbox-kit claude ~/dev/own
 ```
 
 Das ist deutlich schöner zu lesen als 100 Zeilen Bash. Warum ist es dann nicht
@@ -255,7 +255,7 @@ ein Kit kann und ein stabiles Kommando nicht:
 | Startup-Kommandos     | `sbx exec -d`                        |
 
 Das Kit ist also Zucker, kein Ermöglicher. Probier es aus — die Datei liegt
-unter [`devbox/kit/kit.yaml`](../../devbox/kit/kit.yaml) —, aber baue nichts
+unter [`v1/kit/kit.yaml`](../../v1/kit/kit.yaml) —, aber baue nichts
 darauf, was funktionieren _muss_.
 
 ---
@@ -286,7 +286,7 @@ Das Repo gehört dir. Naheliegende nächste Schritte:
 
 ---
 
-📖 Weiterführend: [cheatsheet.md](../cheatsheet.md) hat alle Kommandos auf einer
+📖 Weiterführend: [cheatsheet-v1.md](../cheatsheet-v1.md) hat alle Kommandos auf einer
 Seite (und zeigt, wie du dir einen `devbox`-Alias anlegst),
 [architektur.md](../architektur.md) erklärt das _Warum_ hinter den
 Entscheidungen, [troubleshooting.md](../troubleshooting.md) hilft, wenn etwas

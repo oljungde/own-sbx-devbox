@@ -2,8 +2,8 @@
 
 Die kurze Fassung für den Alltag. Das _Warum_ steht in
 [architektur.md](architektur.md), das _Wie kam es dazu_ im
-[Tutorial](tutorial/README.md). Noch nichts installiert?
-[Kapitel 0](tutorial/00-vorbereitung.md).
+[Tutorial](tutorial-v1/README.md). Noch nichts installiert?
+[Kapitel 0](tutorial-v1/00-vorbereitung.md).
 
 ---
 
@@ -16,17 +16,17 @@ cd ~/dev/own/devbox
 
 # 1  Profil anlegen — welche Ordner die Sandbox sieht
 mkdir -p ~/.config/devbox
-cp devbox/devbox.conf.example ~/.config/devbox/devbox.conf
+cp v1/devbox.conf.example ~/.config/devbox/devbox.conf
 $EDITOR ~/.config/devbox/devbox.conf     # WORKSPACES auf deinen Dach-Ordner
 
 # 2  Host prüfen
-./devbox/devbox.sh doctor                # nur Häkchen erwartet
+./v1/devbox.sh doctor                # nur Häkchen erwartet
 
 # 3  Image bauen und als sbx-Template laden — einmal pro Maschine, ~6 GB
-./devbox/devbox.sh build
+./v1/devbox.sh build
 
 # 4  Sandbox anlegen (beim ersten Mal) und Claude starten
-./devbox/devbox.sh up privat
+./v1/devbox.sh up privat
 
 # 5  In der Sandbox ins Projekt wechseln
 cd projekt-x
@@ -42,7 +42,7 @@ der Alias etwas ändert:
 
 ```bash
 # ohne Alias — nur aus dem Repo-Wurzelverzeichnis
-cd ~/dev/own/devbox && ./devbox/devbox.sh up privat
+cd ~/dev/own/devbox && ./v1/devbox.sh up privat
 
 # mit Alias — aus jedem Verzeichnis
 devbox up privat
@@ -51,7 +51,7 @@ devbox up privat
 Alias einmalig anlegen (macOS/zsh; Linux meist `~/.bashrc`):
 
 ```bash
-echo 'alias devbox="$HOME/dev/own/devbox/devbox/devbox.sh"' >> ~/.zshrc
+echo 'alias devbox="$HOME/dev/own/devbox/v1/devbox.sh"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -77,7 +77,7 @@ Mehr braucht der Alltag nicht.
 ## Globales mitnehmen: Skills, Agents, Plugins, MCP
 
 Der Wrapper hängt fünf Ordner aus `~/.claude` **read-only** in die Sandbox
-(`CLAUDE_SHARED` in [devbox.sh](../devbox/devbox.sh#L47)). Vier davon werden
+(`CLAUDE_SHARED` in [devbox.sh](../v1/devbox.sh#L47)). Vier davon werden
 zusätzlich nach `/home/agent/.claude/` verlinkt — `skills` nicht, dort sitzt
 schon der eigene Store von `sbx`.
 
@@ -94,7 +94,7 @@ schon der eigene Store von `sbx`.
 Was mit Häkchen dasteht, setzt jedes `devbox up` neu. Nachsehen:
 
 ```bash
-./devbox/devbox.sh shell privat
+./v1/devbox.sh shell privat
 ls -la ~/.claude        # agents, commands, rules, plugins als Symlinks
 ```
 
@@ -179,7 +179,7 @@ Dazu den Host freigeben, den der Server anspricht — sonst startet er und kommt
 nicht raus:
 
 ```bash
-./devbox/devbox.sh allow 'mcp.context7.com' privat
+./v1/devbox.sh allow 'mcp.context7.com' privat
 ```
 
 **② `sbx mcp` für Dienste mit OAuth** (Atlassian, Linear, Notion …). Der Server
@@ -239,7 +239,7 @@ Zwei Dinge bleiben auch mit `SHARE_ALL` so, wie sie sind:
   live gemountet, nur ihre Aktivierungsliste wird beim Start geschrieben.
 
 Die lange Fassung mit den Begründungen:
-[Kapitel 6](tutorial/06-globale-und-lokale-config.md).
+[Kapitel 6](tutorial-v1/06-globale-und-lokale-config.md).
 
 ---
 
@@ -249,24 +249,24 @@ Nach einem `git pull` im devbox-Repo:
 
 ```bash
 cd ~/dev/own/devbox && git pull
-./devbox/devbox.sh status        # sagt dir, ob mehr zu tun ist
+./v1/devbox.sh status        # sagt dir, ob mehr zu tun ist
 ```
 
-| Was sich geändert hat        | Was zu tun ist                                                                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/`, `README.md`         | nichts                                                                                                                                                               |
-| `devbox/devbox.sh`           | nichts — der Alias zeigt auf die Datei, der nächste Aufruf nimmt die neue Version                                                                                    |
-| `devbox/Dockerfile`          | **Template neu bauen** — siehe unten                                                                                                                                 |
-| `devbox/devbox.conf.example` | deine `~/.config/devbox/devbox.conf` ist eine **Kopie** und wird nicht mitgezogen. Vergleiche selbst: `diff devbox/devbox.conf.example ~/.config/devbox/devbox.conf` |
+| Was sich geändert hat    | Was zu tun ist                                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/`, `README.md`     | nichts                                                                                                                                                           |
+| `v1/devbox.sh`           | nichts — der Alias zeigt auf die Datei, der nächste Aufruf nimmt die neue Version                                                                                |
+| `v1/Dockerfile`          | **Template neu bauen** — siehe unten                                                                                                                             |
+| `v1/devbox.conf.example` | deine `~/.config/devbox/devbox.conf` ist eine **Kopie** und wird nicht mitgezogen. Vergleiche selbst: `diff v1/devbox.conf.example ~/.config/devbox/devbox.conf` |
 
 ### Template geändert (neues Dockerfile)
 
 `status` und `doctor` melden dann _„Dockerfile hat sich geändert"_.
 
 ```bash
-./devbox/devbox.sh update        # baut neu UND nennt die veralteten Sandboxes
-./devbox/devbox.sh rm privat     # nur für die betroffenen
-./devbox/devbox.sh up privat     # holt das neue Template
+./v1/devbox.sh update        # baut neu UND nennt die veralteten Sandboxes
+./v1/devbox.sh rm privat     # nur für die betroffenen
+./v1/devbox.sh up privat     # holt das neue Template
 ```
 
 Warum drei Schritte: Eine Sandbox wird beim **Anlegen** aus dem Template kopiert
@@ -346,11 +346,11 @@ Login, installierte Pakete, Änderungen. **rm** wirft ihn weg.
 ## Netz
 
 Standardmäßig darf die Sandbox **nur** die Hosts aus `BASE_HOSTS` in
-[devbox.sh](../devbox/devbox.sh#L65-L75): Anthropic, GitHub, npm, PyPI, astral,
+[devbox.sh](../v1/devbox.sh#L65-L75): Anthropic, GitHub, npm, PyPI, astral,
 Aikido. Alles andere schlägt fehl — das ist der Normalfall, kein Defekt.
 
 ```bash
-./devbox/devbox.sh allow '*.googleapis.com' privat    # für jetzt
+./v1/devbox.sh allow '*.googleapis.com' privat    # für jetzt
 ```
 
 Damit es den nächsten Neustart überlebt, den Host als `EXTRA_HOSTS` ins Profil
@@ -365,7 +365,7 @@ $EDITOR ~/.config/devbox/devbox.conf
 ## Profile
 
 Liegen in `~/.config/devbox/devbox.conf`, bewusst außerhalb des Repos. Vorlage:
-[devbox.conf.example](../devbox/devbox.conf.example).
+[devbox.conf.example](../v1/devbox.conf.example).
 
 ```bash
 privat)
@@ -388,8 +388,8 @@ Mehrere Profile laufen gleichzeitig und unabhängig — eigener Zustand, eigene
 Netzregeln, eigener Login:
 
 ```bash
-./devbox/devbox.sh up privat
-./devbox/devbox.sh up lernen
+./v1/devbox.sh up privat
+./v1/devbox.sh up lernen
 ```
 
 ---
@@ -439,11 +439,11 @@ geteilten Store ein. Siehe [architektur.md](architektur.md).
 Der Reihe nach:
 
 ```bash
-./devbox/devbox.sh doctor        # 1. ist der Host eingerichtet?
-./devbox/devbox.sh status        # 2. was läuft, auf welchem Template?
+./v1/devbox.sh doctor        # 1. ist der Host eingerichtet?
+./v1/devbox.sh status        # 2. was läuft, auf welchem Template?
 sbx diagnose                     # 3. ist sbx selbst gesund?
 sbx policy ls devbox-privat      # 4. hängt es am Netz?
-./devbox/devbox.sh shell privat  # 5. selbst nachsehen
+./v1/devbox.sh shell privat  # 5. selbst nachsehen
 ```
 
 Zeigt `status` „kein Template im sbx-Store", ist die zweite Ursache mindestens so
@@ -457,7 +457,7 @@ Die häufigen Fehler in der Reihenfolge, in der sie auftreten:
 
 ## Einen Alias anlegen
 
-Ziel: statt `~/dev/own/devbox/devbox/devbox.sh up privat` nur noch
+Ziel: statt `~/dev/own/devbox/v1/devbox.sh up privat` nur noch
 `devbox up privat` — aus **jedem** Verzeichnis.
 
 Das Skript findet sein Dockerfile selbst (über `BASH_SOURCE`), es ist also
@@ -468,7 +468,7 @@ egal, wo du stehst.
 Standard-Shell ist seit Catalina **zsh**:
 
 ```bash
-echo 'alias devbox="$HOME/dev/own/devbox/devbox/devbox.sh"' >> ~/.zshrc
+echo 'alias devbox="$HOME/dev/own/devbox/v1/devbox.sh"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -479,7 +479,7 @@ automatisch.
 ### Linux
 
 ```bash
-echo 'alias devbox="$HOME/dev/own/devbox/devbox/devbox.sh"' >> ~/.bashrc
+echo 'alias devbox="$HOME/dev/own/devbox/v1/devbox.sh"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -488,7 +488,7 @@ Bei zsh (Arch, Manjaro, oft auch Fedora-Setups) entsprechend `~/.zshrc`.
 ### Windows
 
 `devbox.sh` ist ein Bash-Skript — Windows braucht also eine Bash. Die
-Einrichtung steht in [Kapitel 0](tutorial/00-vorbereitung.md#windows); hier nur
+Einrichtung steht in [Kapitel 0](tutorial-v1/00-vorbereitung.md#windows); hier nur
 der Alias selbst. Zwei Wege:
 
 **① WSL2 — der empfohlene Weg.** Docker Desktop mit WSL2-Backend, alles andere
@@ -496,7 +496,7 @@ läuft dann genau wie unter Linux:
 
 ```bash
 # in der WSL-Distribution
-echo 'alias devbox="$HOME/dev/own/devbox/devbox/devbox.sh"' >> ~/.bashrc
+echo 'alias devbox="$HOME/dev/own/devbox/v1/devbox.sh"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -514,7 +514,7 @@ notepad $PROFILE          # legt die Datei bei Bedarf an
 
 ```powershell
 function devbox {
-    wsl ~/dev/own/devbox/devbox/devbox.sh @args
+    wsl ~/dev/own/devbox/v1/devbox.sh @args
 }
 ```
 
@@ -532,7 +532,7 @@ mehr — zum Beispiel ein Standardprofil setzen:
 ```bash
 # in ~/.zshrc bzw. ~/.bashrc
 devbox() {
-  local skript="$HOME/dev/own/devbox/devbox/devbox.sh"
+  local skript="$HOME/dev/own/devbox/v1/devbox.sh"
   # Ohne Argumente: direkt das Alltagskommando statt der Hilfe.
   if [ $# -eq 0 ]; then
     "$skript" up privat
@@ -549,7 +549,7 @@ schon im `PATH` steht:
 
 ```bash
 mkdir -p ~/.local/bin
-ln -sfn ~/dev/own/devbox/devbox/devbox.sh ~/.local/bin/devbox
+ln -sfn ~/dev/own/devbox/v1/devbox.sh ~/.local/bin/devbox
 ```
 
 `~/.local/bin` ist auf den meisten Linux-Distributionen bereits im `PATH`, auf
@@ -577,14 +577,14 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 Dasselbe, was die CI prüft — läuft auch lokal:
 
 ```bash
-shellcheck devbox/devbox.sh scripts/check-links.sh
-bash -n devbox/devbox.conf.example
+shellcheck v1/devbox.sh scripts/check-links.sh
+bash -n v1/devbox.conf.example
 ./scripts/check-links.sh
 ```
 
 Nach Änderungen am Dockerfile zusätzlich:
 
 ```bash
-./devbox/devbox.sh update
+./v1/devbox.sh update
 docker run --rm devbox/base:latest bash -lc 'python --version; pnpm --version'
 ```

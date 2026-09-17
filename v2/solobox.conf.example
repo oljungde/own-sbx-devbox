@@ -6,7 +6,7 @@
 # Was `doctor` als Standard anzeigt, kannst du hier übersteuern:
 #
 #   mkdir -p ~/.config/solobox
-#   cp solobox/solobox.conf.example ~/.config/solobox/solobox.conf
+#   cp v2/solobox.conf.example ~/.config/solobox/solobox.conf
 #
 # Die Datei wird von solobox.sh eingelesen (`source`) und ist ganz normales
 # Bash. Es gibt kein Profil und kein `case` — es gibt genau eine Sandbox.

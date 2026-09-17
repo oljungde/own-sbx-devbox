@@ -27,8 +27,8 @@ in den letzten fünf Kapiteln getan.
 ## Einrichten
 
 ```bash
-chmod +x solobox/solobox.sh
-./solobox/solobox.sh install
+chmod +x v2/solobox.sh
+./v2/solobox.sh install
 ```
 
 `install` legt einen Symlink `~/.local/bin/solobox` an, der ins Repo zeigt. Das
@@ -156,7 +156,7 @@ Deshalb trägt jedes Image seine Herkunft jetzt **selbst** mit sich:
 docker image inspect solobox/base:latest \
   --format '{{index .Config.Labels "solobox.dockerfile-sha"}}'
 sbx exec solobox cat /etc/solobox-stamp
-shasum -a 256 solobox/Dockerfile | cut -d' ' -f1     # muss übereinstimmen
+shasum -a 256 v2/Dockerfile | cut -d' ' -f1     # muss übereinstimmen
 ```
 
 > 🎯 **Beobachtete Tatsachen schlagen Merkzettel.** Ein Merkzettel kann fehlen
@@ -184,7 +184,7 @@ was die Sandbox eigentlich sieht.
 
 ```bash
 mkdir -p ~/.config/solobox
-cp solobox/solobox.conf.example ~/.config/solobox/solobox.conf
+cp v2/solobox.conf.example ~/.config/solobox/solobox.conf
 ```
 
 Fünf Variablen, alle optional:
@@ -253,7 +253,7 @@ Sitzt alles, bist du durch.
 
 ## Und jetzt?
 
-- [cheatsheet-solo.md](../cheatsheet-solo.md) — alles auf einer Seite
+- [cheatsheet-v2.md](../cheatsheet-v2.md) — alles auf einer Seite
 - [architektur.md](../architektur.md) — warum es so gebaut ist, inklusive der
   Unterschiede zu Variante 1
 - [troubleshooting.md](../troubleshooting.md) — wenn etwas klemmt

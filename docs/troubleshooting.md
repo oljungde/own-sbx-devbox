@@ -8,15 +8,15 @@ im Wrapper. Was nur `solobox` betrifft, steht gesammelt am
 
 ---
 
-## Windows: `./devbox/devbox.sh` wird nicht erkannt
+## Windows: `./v1/devbox.sh` wird nicht erkannt
 
 ```bash
-./devbox/devbox.sh : The term './devbox/devbox.sh' is not recognized as the name
+./v1/devbox.sh : The term './v1/devbox.sh' is not recognized as the name
 of a cmdlet, function, script file, or operable program.
 ```
 
 `devbox.sh` ist ein Bash-Skript, PowerShell kann es nicht ausführen. Nutze
-**WSL2** — Einrichtung in [Kapitel 0](tutorial/00-vorbereitung.md#windows).
+**WSL2** — Einrichtung in [Kapitel 0](tutorial-v1/00-vorbereitung.md#windows).
 
 Läuft es in WSL, ist aber quälend langsam: Liegt das Repo unter `/mnt/c/...`?
 Dann in das WSL-Dateisystem verschieben (`~/dev/own/devbox`). Der Zugriff über
@@ -79,7 +79,7 @@ for d in agents skills commands rules plugins; do mkdir -p ~/.claude/$d; done
 
 Du versuchst, einer **bestehenden** Sandbox einen Ordner nachzureichen. Das geht
 nicht — Workspaces sind nur beim Anlegen setzbar (siehe
-[Kapitel 5](tutorial/05-mehrere-projekte.md)).
+[Kapitel 5](tutorial-v1/05-mehrere-projekte.md)).
 
 Entweder du kommst ohne den Ordner aus, oder:
 
@@ -216,14 +216,14 @@ dann kopiert jedes `up` die globalen Skills selbst dorthin:
 
 ```bash
 $EDITOR ~/.config/devbox/devbox.conf     # SHARE_ALL=1 im gewünschten Profil
-./devbox/devbox.sh up privat
+./v1/devbox.sh up privat
 ```
 
 Von Hand ginge auch `sbx skills import`.
 
 ⚠️ Beides wirkt auf **alle** Sandboxes des Rechners, nicht nur auf devbox. Die
 Abwägung steht in
-[Kapitel 6](tutorial/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet).
+[Kapitel 6](tutorial-v1/06-globale-und-lokale-config.md#alles-auf-einmal--und-was-es-kostet).
 
 ---
 
@@ -290,9 +290,9 @@ Erwartet. Eine Sandbox wird beim **Anlegen** aus dem Template kopiert und danach
 nie wieder daran angeglichen. Ein neues Template erreicht sie nicht.
 
 ```bash
-./devbox/devbox.sh update        # baut neu und nennt die veralteten Sandboxes
-./devbox/devbox.sh rm privat     # nur für die betroffene
-./devbox/devbox.sh up privat     # holt das neue Template
+./v1/devbox.sh update        # baut neu und nennt die veralteten Sandboxes
+./v1/devbox.sh rm privat     # nur für die betroffene
+./v1/devbox.sh up privat     # holt das neue Template
 ```
 
 Der Preis dafür steht im nächsten Abschnitt. Wer ihn vermeiden will, installiert
@@ -337,8 +337,8 @@ Das Image belegt rund 5,9 GB, die tar-Datei beim Übertragen etwa 1,4 GB
 Der Symlink fehlt oder liegt nicht auf dem `PATH`:
 
 ```bash
-chmod +x solobox/solobox.sh
-./solobox/solobox.sh install
+chmod +x v2/solobox.sh
+./v2/solobox.sh install
 solobox doctor
 ```
 
@@ -350,7 +350,7 @@ Dem Skript fehlt das Ausführbar-Bit — bei frisch geschriebenen Dateien der
 Normalfall:
 
 ```bash
-chmod +x solobox/solobox.sh
+chmod +x v2/solobox.sh
 ```
 
 Genau das prüft die CI mit `test -x`, damit es niemandem sonst passiert.
@@ -434,7 +434,7 @@ HOOK_SKIP=(Notification Stop)   # Standard
 
 `solobox sync` schreibt die Datei danach neu. Alternativ den Hook auf dem Host
 verträglich machen — die Zeile dafür steht in
-[Tutorial-Kapitel 3](tutorial-solo/03-hooks-plugins-settings.md).
+[Tutorial-Kapitel 3](tutorial-v2/03-hooks-plugins-settings.md).
 
 ## Ein neuer Skill vom Host fehlt in der Sandbox
 
@@ -589,7 +589,7 @@ verschoben wurde:
 
 ```bash
 ls -l ~/.local/bin/solobox        # wohin zeigt er?
-cd <pfad-zum-repo> && ./solobox/solobox.sh install
+cd <pfad-zum-repo> && ./v2/solobox.sh install
 solobox doctor
 ```
 

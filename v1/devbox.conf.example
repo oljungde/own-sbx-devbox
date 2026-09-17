@@ -4,7 +4,7 @@
 # Kopiere diese Datei nach ~/.config/devbox/devbox.conf und passe die Pfade an:
 #
 #   mkdir -p ~/.config/devbox
-#   cp devbox/devbox.conf.example ~/.config/devbox/devbox.conf
+#   cp v1/devbox.conf.example ~/.config/devbox/devbox.conf
 #
 # Die Datei wird von devbox.sh eingelesen (`source`). Sie ist also ganz normales
 # Bash. Beim Aufruf von `./devbox.sh up <profil>` steht der gewünschte Profilname

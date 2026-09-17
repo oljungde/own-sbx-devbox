@@ -1,7 +1,7 @@
 # =============================================================================
 # solobox — Bauanleitung für die eine Sandbox
 #
-# Was hier anders ist als in devbox/Dockerfile (Variante 1):
+# Was hier anders ist als in v1/Dockerfile (Variante 1):
 #
 #   - DREI Pythons statt einem: 3.10, 3.12 und 3.14, mit 3.12 als Standard.
 #     Eine einzige Sandbox bedient alle Projekte, und die haben nicht alle
@@ -130,7 +130,7 @@ RUN npm install -g @aikidosec/safe-chain \
     && for tool in npm npx pnpm pnpx uv uvx; do \
          printf '%s\n' \
            '#!/bin/sh' \
-           '# Von solobox erzeugter Safe-Chain-Shim — siehe solobox/Dockerfile.' \
+           '# Von solobox erzeugter Safe-Chain-Shim — siehe v2/Dockerfile.' \
            '# Shim-Verzeichnis aus dem PATH nehmen, sonst ruft aikido-* uns erneut auf.' \
            'PATH="$(printf "%s" "$PATH" | sed -e "s|/opt/safe-chain/shims:||g")"' \
            'export PATH' \

@@ -5,11 +5,11 @@
 #     "EXPERIMENTAL: this command may change or be removed in future releases."
 #
 #     Deshalb ist DIES NICHT der Hauptweg von devbox. Der stabile Weg ist
-#     devbox/devbox.sh — dieses Kit zeigt nur, wie dieselbe Konfiguration
+#     v1/devbox.sh — dieses Kit zeigt nur, wie dieselbe Konfiguration
 #     aussähe, wenn man sie deklarieren statt skripten würde.
 #
 # Ausprobieren:
-#     sbx create --kit ./devbox/kit/ --name devbox-kit claude ~/dev/own
+#     sbx create --kit ./v1/kit/ --name devbox-kit claude ~/dev/own
 #
 # Was ein Kit NICHT abnimmt: die Workspaces. Die stehen weiterhin hinter dem
 # Agent-Namen auf der Kommandozeile.
@@ -22,7 +22,7 @@ name: devbox
 displayName: devbox — Claude-Sandbox für mehrere Projekte
 description: >-
   Python 3.10/3.12/3.14, Node 24, pnpm, uv, poetry, ruff, Playwright und
-  Safe Chain. Deklarative Variante zu devbox/devbox.sh.
+  Safe Chain. Deklarative Variante zu v1/devbox.sh.
 
 sandbox:
   # Das Template, das wir in Kapitel 3 gebaut und mit `sbx template load`

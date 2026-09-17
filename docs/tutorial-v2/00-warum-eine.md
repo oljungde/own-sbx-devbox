@@ -42,13 +42,13 @@ liegen in diesem Repo nebeneinander und stören sich nicht.
 ## Das Dockerfile — und warum es fast dasselbe ist
 
 Wie man ein Dockerfile für `sbx` schreibt, steht im devbox-Tutorial
-([Kapitel 2](../tutorial/02-eigenes-dockerfile.md) und
-[Kapitel 3](../tutorial/03-bauen-und-laden.md)). Hier steht die fertige Fassung.
+([Kapitel 2](../tutorial-v1/02-eigenes-dockerfile.md) und
+[Kapitel 3](../tutorial-v1/03-bauen-und-laden.md)). Hier steht die fertige Fassung.
 Sieh sie dir an — und vergleiche:
 
 ```bash
-less solobox/Dockerfile
-diff <(grep -c '' devbox/Dockerfile) <(grep -c '' solobox/Dockerfile) || true
+less v2/Dockerfile
+diff <(grep -c '' v1/Dockerfile) <(grep -c '' v2/Dockerfile) || true
 ```
 
 Die erste Erkenntnis dieses Kapitels ist eine Enttäuschung:
@@ -183,13 +183,13 @@ Zuerst das Ausführbar-Bit setzen — frisch aus git geklonte Skripte haben es,
 frisch geschriebene nicht immer:
 
 ```bash
-chmod +x solobox/solobox.sh
+chmod +x v2/solobox.sh
 ```
 
 Dann bauen. Das dauert beim ersten Mal einige Minuten:
 
 ```bash
-./solobox/solobox.sh build
+./v2/solobox.sh build
 ```
 
 Was dabei passiert, ist genau das, was du in devbox-Kapitel 3 von Hand getippt
@@ -209,7 +209,7 @@ Erwartet: eine Zeile mit `docker.io/solobox/base` und Tag `latest`.
 Oder in einem Rutsch, samt der Frage, ob überhaupt noch etwas zu tun ist:
 
 ```bash
-./solobox/solobox.sh check
+./v2/solobox.sh check
 ```
 
 Was dieses Kommando alles beantwortet, steht in

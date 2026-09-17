@@ -174,7 +174,7 @@ RUN npm install -g @aikidosec/safe-chain \
     && for tool in npm npx pnpm pnpx uv uvx; do \
          printf '%s\n' \
            '#!/bin/sh' \
-           '# Von devbox erzeugter Safe-Chain-Shim — siehe devbox/Dockerfile, Schritt 8.' \
+           '# Von devbox erzeugter Safe-Chain-Shim — siehe v1/Dockerfile, Schritt 8.' \
            '# Shim-Verzeichnis aus dem PATH nehmen, sonst ruft aikido-* uns erneut auf.' \
            'PATH="$(printf "%s" "$PATH" | sed -e "s|/opt/safe-chain/shims:||g")"' \
            'export PATH' \

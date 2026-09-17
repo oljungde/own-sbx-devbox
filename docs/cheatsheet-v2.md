@@ -1,7 +1,7 @@
 # Cheat Sheet — solobox
 
 Alles für **Variante 2**: genau eine Sandbox systemweit. Für Variante 1 (mehrere
-Sandboxes nach Profil) siehe [cheatsheet.md](cheatsheet.md).
+Sandboxes nach Profil) siehe [cheatsheet-v1.md](cheatsheet-v1.md).
 
 ---
 
@@ -9,8 +9,8 @@ Sandboxes nach Profil) siehe [cheatsheet.md](cheatsheet.md).
 
 ```bash
 # 1  Ausführbar machen und auf den PATH legen
-chmod +x solobox/solobox.sh
-./solobox/solobox.sh install          # -> ~/.local/bin/solobox
+chmod +x v2/solobox.sh
+./v2/solobox.sh install          # -> ~/.local/bin/solobox
 
 # 2  Host prüfen
 solobox doctor
@@ -44,12 +44,12 @@ solobox check --base   # zusätzlich: hat sich das Basis-Image bewegt? (Netz)
 solobox check || echo "Stufe $?"
 ```
 
-| Ebene | Frage                                      | Maßnahme                    |
-| ----- | ------------------------------------------ | --------------------------- |
-| 1     | Image auf dem Stand des Dockerfiles?       | `solobox build`             |
-| 2     | Image auch im sbx-Store?                   | `solobox build`             |
-| 3     | Sandbox auf diesem Image?                  | `solobox rm && solobox up`  |
-| 4     | Mounts passen zu `ROOTS`/`CLAUDE_SHARED`?  | `solobox rm && solobox up`  |
+| Ebene | Frage                                     | Maßnahme                   |
+| ----- | ----------------------------------------- | -------------------------- |
+| 1     | Image auf dem Stand des Dockerfiles?      | `solobox build`            |
+| 2     | Image auch im sbx-Store?                  | `solobox build`            |
+| 3     | Sandbox auf diesem Image?                 | `solobox rm && solobox up` |
+| 4     | Mounts passen zu `ROOTS`/`CLAUDE_SHARED`? | `solobox rm && solobox up` |
 
 | Exitcode | Bedeutung                        |
 | -------- | -------------------------------- |
@@ -64,7 +64,7 @@ Von Hand nachsehen, woraus etwas entstanden ist:
 docker image inspect solobox/base:latest \
   --format '{{index .Config.Labels "solobox.dockerfile-sha"}}'
 sbx exec solobox cat /etc/solobox-stamp
-shasum -a 256 solobox/Dockerfile | cut -d' ' -f1
+shasum -a 256 v2/Dockerfile | cut -d' ' -f1
 ```
 
 ## Wenn sich auf dem Host etwas geändert hat
@@ -163,7 +163,7 @@ mitverändern — `sbx ls` zeigt, wie viele das sind.
 
 ## Konfiguration (optional)
 
-`~/.config/solobox/solobox.conf`, Vorlage: `solobox/solobox.conf.example`
+`~/.config/solobox/solobox.conf`, Vorlage: `v2/solobox.conf.example`
 
 ```bash
 ROOTS=("$HOME/dev")                         # ⚠️ nur beim Anlegen, nur Verzeichnisse
@@ -199,17 +199,17 @@ laufend angeglichen. `solobox rm && solobox up` — und der Login ist weg.
 
 ## Unterschiede zu devbox auf einen Blick
 
-|                       | devbox                         | solobox                 |
-| --------------------- | ------------------------------ | ----------------------- |
-| Aufruf                | `./devbox/devbox.sh up privat` | `solobox up` im Projekt |
-| Sandboxes             | eine pro Profil                | genau eine              |
-| Conf                  | Pflicht                        | optional                |
-| Skills/Agents global  | über `SHARE_ALL`               | immer                   |
-| Hooks aus `~/.claude` | nein                           | ja, gefiltert           |
-| Startordner           | Primary Workspace              | das aktuelle Projekt    |
+|                       | devbox                     | solobox                 |
+| --------------------- | -------------------------- | ----------------------- |
+| Aufruf                | `./v1/devbox.sh up privat` | `solobox up` im Projekt |
+| Sandboxes             | eine pro Profil            | genau eine              |
+| Conf                  | Pflicht                    | optional                |
+| Skills/Agents global  | über `SHARE_ALL`           | immer                   |
+| Hooks aus `~/.claude` | nein                       | ja, gefiltert           |
+| Startordner           | Primary Workspace          | das aktuelle Projekt    |
 
 ## Wenn etwas klemmt
 
 - [troubleshooting.md](troubleshooting.md)
-- [Tutorial](tutorial-solo/README.md)
+- [Tutorial](tutorial-v2/README.md)
 - [architektur.md](architektur.md)

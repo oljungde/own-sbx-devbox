@@ -102,7 +102,7 @@ DOCKERFILE="$SCRIPT_DIR/Dockerfile"
 if [ ! -f "$DOCKERFILE" ]; then
   printf 'FEHLER: Dockerfile nicht gefunden: %s\n' "$DOCKERFILE" >&2
   printf 'FEHLER: solobox.sh erwartet es im selben Ordner. Wurde das Repo verschoben?\n' >&2
-  printf 'FEHLER: Dann den Symlink neu setzen: <repo>/solobox/solobox.sh install\n' >&2
+  printf 'FEHLER: Dann den Symlink neu setzen: <repo>/v2/solobox.sh install\n' >&2
   exit 1
 fi
 
@@ -1301,7 +1301,7 @@ usage() {
     '  rm            Die Sandbox entfernen (fragt vorher nach).' \
     '' \
     'Konfiguration (optional): ~/.config/solobox/solobox.conf' \
-    'Vorlage: solobox/solobox.conf.example'
+    'Vorlage: v2/solobox.conf.example'
 }
 
 # --- Einstiegspunkt ----------------------------------------------------------

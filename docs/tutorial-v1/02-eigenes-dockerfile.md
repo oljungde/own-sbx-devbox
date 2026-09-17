@@ -30,15 +30,17 @@ Sandboxes — für dein privates Zeug, für den Kurs, für ein Experiment.
 ## Das Repo anlegen
 
 ```bash
-mkdir -p ~/dev/own/devbox/devbox
+mkdir -p ~/dev/own/devbox/v1
 cd ~/dev/own/devbox
 git init
 ```
 
-Der Unterordner heißt bewusst `devbox/` und **nicht** `sbx/`. Falls auf deinem
-Rechner noch ein anderes Sandbox-Setup läuft, erkennen manche Wrapper einen
-Ordner namens `sbx/` automatisch und schalten in einen Sondermodus. Ein eigener
-Name erspart dir stundenlange Fehlersuche.
+Der Unterordner heißt `v1/` — hier wohnt Variante 1. Die beiden anderen
+Varianten liegen später daneben in `v2/` und `v3/`, und keine von ihnen heißt
+`sbx/`. Das ist Absicht: Falls auf deinem Rechner noch ein anderes
+Sandbox-Setup läuft, erkennen manche Wrapper einen Ordner namens `sbx/`
+automatisch und schalten in einen Sondermodus. Ein eigener Name erspart dir
+stundenlange Fehlersuche.
 
 ## Die Basis
 
@@ -91,7 +93,7 @@ und überspringt `node_modules`. Sekunden werden zu Millisekunden.
 
 Der Rest des Dockerfiles folgt immer demselben Muster: installieren, an einen
 Ort legen, den auch der Laufzeit-User lesen kann, fertig. Die vollständige Datei
-mit allen Kommentaren liegt unter [`devbox/Dockerfile`](../../devbox/Dockerfile)
+mit allen Kommentaren liegt unter [`v1/Dockerfile`](../../v1/Dockerfile)
 — **lies sie einmal von oben nach unten durch.** Sie ist absichtlich so
 kommentiert, dass sie sich wie ein Text liest.
 
@@ -148,8 +150,8 @@ als `root` — und das untergräbt einen Teil dessen, wofür die Sandbox da ist.
 
 ---
 
-Lege jetzt die Datei `devbox/Dockerfile` an. Nimm den Inhalt aus
-[`devbox/Dockerfile`](../../devbox/Dockerfile) dieses Repos — sie ist
+Lege jetzt die Datei `v1/Dockerfile` an. Nimm den Inhalt aus
+[`v1/Dockerfile`](../../v1/Dockerfile) dieses Repos — sie ist
 durchkommentiert und genau der Stand, den Kapitel 3 baut.
 
 ➡️ **Weiter mit [Kapitel 3 — Bauen und laden](03-bauen-und-laden.md)**

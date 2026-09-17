@@ -5,7 +5,7 @@ Claude-Sandbox hat, alle aus demselben Image — mit einer Benachrichtigung, die
 im Container wirklich funktioniert, und mit Rückfragen genau dort, wo etwas
 Unumkehrbares passiert.
 
-Diese Variante steht für sich. Du brauchst weder `devbox/` noch `solobox/`
+Diese Variante steht für sich. Du brauchst weder `v1/` noch `v2/`
 gelesen zu haben, und nichts von dort gilt hier automatisch.
 
 ## Die Kapitel

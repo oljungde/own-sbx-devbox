@@ -3,13 +3,13 @@
 #
 # Was hier NICHT passiert: das Image bauen. Das sind rund 6 GB und mehrere
 # Minuten pro Lauf, und ein Fehler im Dockerfile fällt beim ersten lokalen
-# `./devbox/devbox.sh build` sowieso auf. Die CI prüft das, was leise kaputt
+# `./v1/devbox.sh build` sowieso auf. Die CI prüft das, was leise kaputt
 # geht: Shell-Fehler und Links, die ins Leere zeigen.
 #
 # Alles hier läuft auch lokal:
-#   shellcheck devbox/devbox.sh scripts/check-links.sh
+#   shellcheck v1/devbox.sh scripts/check-links.sh
 #   ./scripts/check-links.sh
-#   bash -n devbox/devbox.conf.example
+#   bash -n v1/devbox.conf.example
 # =============================================================================
 
 name: CI
@@ -44,7 +44,7 @@ jobs:
       # Sandbox und Mac.
       - name: Shell-Skripte prüfen
         run: |
-          shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
+          shellcheck v1/devbox.sh v2/solobox.sh scripts/check-links.sh
           shellcheck v3/sbx-claude.sh v3/hooks/notify.sh v3/hooks/watch.sh
 
       # Die Profilvorlage wird von devbox.sh per `source` gelesen. Ein
@@ -54,8 +54,8 @@ jobs:
       # Fehler darin deshalb noch später auffiele.
       - name: Konfigurationsvorlagen sind gültiges Bash
         run: |
-          bash -n devbox/devbox.conf.example
-          bash -n solobox/solobox.conf.example
+          bash -n v1/devbox.conf.example
+          bash -n v2/solobox.conf.example
           bash -n v3/sbx-claude.conf.example
 
       # Alle Wrapper werden über einen Symlink bzw. direkt aufgerufen — ohne
@@ -68,8 +68,8 @@ jobs:
       # braucht das Bit im Repo also nicht.
       - name: Wrapper sind ausführbar
         run: |
-          test -x devbox/devbox.sh
-          test -x solobox/solobox.sh
+          test -x v1/devbox.sh
+          test -x v2/solobox.sh
           test -x v3/sbx-claude.sh
           test -x v3/hooks/watch.sh
 

@@ -10,7 +10,7 @@ Sandbox daraus starten.
 ## Schritt 1: Bauen
 
 ```bash
-cd ~/dev/own/devbox/devbox
+cd ~/dev/own/devbox/v1
 docker build -t devbox/base:latest -f Dockerfile .
 ```
 

@@ -18,8 +18,8 @@ machen.
 
 ## Die Grenze soll dort verlaufen, wo die Projektgrenze verläuft
 
-Die beiden Schwestervarianten setzen die Sandbox-Grenze woanders: `devbox/` pro
-Profil, `solobox/` genau einmal systemweit. Beides funktioniert und beides hat
+Die beiden Schwestervarianten setzen die Sandbox-Grenze woanders: `v1/` pro
+Profil, `v2/` genau einmal systemweit. Beides funktioniert und beides hat
 denselben Bruch — mehrere Projekte teilen eine Box. Ein Agent, der in Projekt A
 arbeitet, sieht Projekt B.
 
@@ -357,8 +357,8 @@ In `solobox`, mit genau einer Box, kostet Nachlegen fast nichts. Dieselbe
 | git-Sperre | mit vollem Token eine Bremse, keine Grenze |
 | Host-Prozess | der Wächter muss laufen, sonst kommt keine Meldung an |
 
-Wer diese Preise nicht zahlen will, ist mit `solobox/` (eine Box für alles) oder
-`devbox/` (eine Box pro Profil) besser bedient. Die drei Varianten teilen nichts
+Wer diese Preise nicht zahlen will, ist mit `v2/` (eine Box für alles) oder
+`v1/` (eine Box pro Profil) besser bedient. Die drei Varianten teilen nichts
 ausser den `sbx`-Begriffen und können nebeneinander laufen.
 
 ## Was bewusst *nicht* gemacht wurde

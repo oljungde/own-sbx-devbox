@@ -46,7 +46,7 @@ while IFS= read -r -d '' datei; do
 
     geprueft=$((geprueft + 1))
 
-    # Ein Link auf ein Verzeichnis ("docs/tutorial/") ist gültig, wenn es das
+    # Ein Link auf ein Verzeichnis ("docs/tutorial-v1/") ist gültig, wenn es das
     # Verzeichnis gibt — GitHub zeigt dann dessen Inhalt an.
     if [ ! -e "$verzeichnis/$pfad" ]; then
       printf '%s: Link zeigt ins Leere -> %s\n' "$datei" "$ziel" >&2

@@ -41,9 +41,9 @@ beim Übertragen in den `sbx`-Store entsteht kurzzeitig eine tar-Datei von rund
 
 ## Wenn du feststeckst
 
-- [cheatsheet.md](../cheatsheet.md) — alle Kommandos auf einer Seite
+- [cheatsheet-v1.md](../cheatsheet-v1.md) — alle Kommandos auf einer Seite
 - [troubleshooting.md](../troubleshooting.md) — die häufigen Fehler in der
   Reihenfolge, in der sie auftreten
 - [architektur.md](../architektur.md) — warum devbox so gebaut ist
-- Die Referenz-Dateien in diesem Repo (`devbox/Dockerfile`, `devbox/devbox.sh`)
+- Die Referenz-Dateien in diesem Repo (`v1/Dockerfile`, `v1/devbox.sh`)
   sind der Stand nach Kapitel 7. Vergleiche im Zweifel damit.

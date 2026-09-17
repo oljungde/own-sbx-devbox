@@ -3,7 +3,7 @@
 **Ziel:** `sbx` und Docker auf deinem Rechner zum Laufen bringen — und vorher
 wissen, ob dein Rechner überhaupt mitspielt.
 
-**Am Ende dieses Kapitels:** `./devbox/devbox.sh doctor` zeigt nur Häkchen.
+**Am Ende dieses Kapitels:** `./v1/devbox.sh doctor` zeigt nur Häkchen.
 
 > Wenn `sbx version` und `docker --version` bei dir schon antworten, überspring
 > dieses Kapitel und fang mit [Kapitel 1](01-nackt-starten.md) an.
@@ -182,7 +182,7 @@ cd ~/dev/own/devbox
 ## Geschafft
 
 ```bash
-./devbox/devbox.sh doctor
+./v1/devbox.sh doctor
 ```
 
 Erwartet werden Häkchen bei `sbx`, `docker` und `git`. Dass `~/.config/devbox/devbox.conf`

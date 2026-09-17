@@ -5,10 +5,10 @@ Es ist zugleich **Kursmaterial** — jede Datei wird von Lernenden gelesen.
 
 Es gibt **drei Varianten**, die sich nichts teilen und nebeneinander laufen:
 
-| | `devbox/` (Variante 1) | `solobox/` (Variante 2) | `v3/` (Variante 3) |
+| | `v1/` (Variante 1) | `v2/` (Variante 2) | `v3/` (Variante 3) |
 | --- | --- | --- | --- |
 | Sandboxes | eine pro Profil | genau eine, systemweit | eine pro Projekt, ein Image |
-| Aufruf | `./devbox/devbox.sh up privat` | `solobox up` im Projektordner | `sbx-claude up` im Projektordner |
+| Aufruf | `./v1/devbox.sh up privat` | `solobox up` im Projektordner | `sbx-claude up` im Projektordner |
 | Conf | Pflicht | optional | optional |
 | Globales aus `~/.claude` | über `SHARE_ALL` zuschaltbar | immer, inkl. Hooks und Plugins | immer; Hooks werden **ersetzt** |
 | Berechtigungen | Image-Standard | `acceptEdits` | `bypassPermissions` + `ask` auf git |
@@ -29,9 +29,9 @@ Rechner den geteilten, read-write Skill-Store ein, auch `solobox`, deren
 
 - **Kommentare auf Deutsch.** Sie sind Lehrmaterial, nicht Beiwerk. Erkläre das
   _Warum_, nicht das _Was_. Die `README.md` ist die einzige englische Datei.
-- **Nur stabile `sbx`-Flags** in `devbox/devbox.sh`. `sbx kit` und `sbx skills`
+- **Nur stabile `sbx`-Flags** in `v1/devbox.sh`. `sbx kit` und `sbx skills`
   sind EXPERIMENTAL und gehören nicht in den kritischen Pfad — die Kit-Variante
-  liegt bewusst separat unter `devbox/kit/`.
+  liegt bewusst separat unter `v1/kit/`.
 - **Netzregeln immer mit `--sandbox`**, nie global. Auf derselben Maschine kann
   ein anderes Sandbox-Setup laufen, das nicht verändert werden darf.
 - **`SHARE_ALL` bleibt standardmäßig aus.** Der Schalter nimmt genau die
@@ -42,9 +42,9 @@ Rechner den geteilten, read-write Skill-Store ein, auch `solobox`, deren
 - **Nichts `sbx/` nennen.** Fremde Wrapper erkennen diesen Ordnernamen im
   Git-Root automatisch und kapern sonst dieses Repo.
 - Ändert sich das Verhalten, muss das passende Tutorial-Kapitel unter
-  `docs/tutorial/` bzw. `docs/tutorial-solo/` mitgezogen werden.
+  `docs/tutorial-v1/` bzw. `docs/tutorial-v2/` mitgezogen werden.
 
-## Zusätzlich für `solobox/`
+## Zusätzlich für `v2/`
 
 - **Die eine Ausnahme von der Flag-Regel:** `--no-share-skills` ist in
   `sbx create --help` nicht dokumentiert und gehört zum EXPERIMENTAL-Kommando
@@ -82,11 +82,11 @@ Rechner den geteilten, read-write Skill-Store ein, auch `solobox`, deren
 - **Safe Chain nie als Shell-Funktion.** Funktionen existieren nur in der Shell;
   `timeout npm install …`, `env npm …` und `xargs … npm` hebeln sie aus —
   nachgemessen, das Testpaket ging durch. Es müssen Shims im `PATH` sein, wie in
-  `devbox/Dockerfile`. Schalter heißt hier `SOLOBOX_SAFE_CHAIN`.
+  `v1/Dockerfile`. Schalter heißt hier `SOLOBOX_SAFE_CHAIN`.
 
 ## Zusätzlich für `v3/`
 
-Die Fallen aus `solobox/` gelten hier alle mit (Shell-Prüfung, Symlink-Auflösung,
+Die Fallen aus `v2/` gelten hier alle mit (Shell-Prüfung, Symlink-Auflösung,
 Stempelblock am Ende, `pruefe_stand` nie in einer Pipe, Safe Chain als Shims —
 der Schalter heißt hier `SBX_CLAUDE_SAFE_CHAIN`). Dazu kommen sieben Regeln, die
 nur hier gelten:
@@ -134,44 +134,44 @@ Drift-Check.
 
 ## Aufbau
 
-| Pfad                           | Inhalt                                          |
-| ------------------------------ | ----------------------------------------------- |
-| `devbox/Dockerfile`            | Toolchain des Images (Variante 1)               |
-| `devbox/devbox.sh`             | Wrapper um `sbx` (der Hauptweg)                 |
-| `devbox/devbox.conf.example`   | Profilvorlage                                   |
-| `devbox/kit/kit.yaml`          | deklarative Variante (Kür)                      |
-| `solobox/Dockerfile`           | Toolchain des Images (Variante 2)               |
-| `solobox/solobox.sh`           | Wrapper für die eine Sandbox                    |
-| `solobox/solobox.conf.example` | Konfigurationsvorlage (optional)                |
-| `v3/Dockerfile`                | Toolchain des Images (Variante 3), voll ausgestattet |
-| `v3/sbx-claude.sh`             | Wrapper: eine Sandbox pro Projekt               |
-| `v3/sbx-claude.conf.example`   | Konfigurationsvorlage (optional)                |
-| `v3/hooks/notify.sh`           | läuft IM Container: Ereigniszeile + Glocke      |
-| `v3/hooks/watch.sh`            | läuft auf dem HOST: Ereignis → Meldung          |
-| `docs/tutorial/`               | Tutorial Variante 1: Kapitel 0 plus sieben      |
-| `docs/tutorial-solo/`          | Tutorial Variante 2: sieben Kapitel             |
-| `v3/docs/tutorial/`            | Tutorial Variante 3: Kapitel 0 bis 8            |
-| `docs/cheatsheet.md`           | alle Kommandos von Variante 1                   |
-| `docs/cheatsheet-solo.md`      | alle Kommandos von Variante 2                   |
-| `v3/docs/cheatsheet.md`        | alle Kommandos von Variante 3                   |
-| `docs/architektur.md`          | die Begründungen (Varianten 1 und 2)            |
-| `v3/docs/architektur.md`       | die Begründungen (Variante 3)                   |
-| `docs/troubleshooting.md`      | Fehlersuche (Varianten 1 und 2)                 |
-| `v3/docs/troubleshooting.md`   | Fehlersuche (Variante 3)                        |
-| `scripts/check-links.sh`       | prüft relative Links in der Doku                |
-| `.github/workflows/ci.yml`     | shellcheck + Linkprüfung                        |
+| Pfad                         | Inhalt                                               |
+| ---------------------------- | ---------------------------------------------------- |
+| `v1/Dockerfile`              | Toolchain des Images (Variante 1)                    |
+| `v1/devbox.sh`               | Wrapper um `sbx` (der Hauptweg)                      |
+| `v1/devbox.conf.example`     | Profilvorlage                                        |
+| `v1/kit/kit.yaml`            | deklarative Variante (Kür)                           |
+| `v2/Dockerfile`              | Toolchain des Images (Variante 2)                    |
+| `v2/solobox.sh`              | Wrapper für die eine Sandbox                         |
+| `v2/solobox.conf.example`    | Konfigurationsvorlage (optional)                     |
+| `v3/Dockerfile`              | Toolchain des Images (Variante 3), voll ausgestattet |
+| `v3/sbx-claude.sh`           | Wrapper: eine Sandbox pro Projekt                    |
+| `v3/sbx-claude.conf.example` | Konfigurationsvorlage (optional)                     |
+| `v3/hooks/notify.sh`         | läuft IM Container: Ereigniszeile + Glocke           |
+| `v3/hooks/watch.sh`          | läuft auf dem HOST: Ereignis → Meldung               |
+| `docs/tutorial-v1/`          | Tutorial Variante 1: Kapitel 0 plus sieben           |
+| `docs/tutorial-v2/`          | Tutorial Variante 2: sieben Kapitel                  |
+| `v3/docs/tutorial/`          | Tutorial Variante 3: Kapitel 0 bis 8                 |
+| `docs/cheatsheet-v1.md`      | alle Kommandos von Variante 1                        |
+| `docs/cheatsheet-v2.md`      | alle Kommandos von Variante 2                        |
+| `v3/docs/cheatsheet.md`      | alle Kommandos von Variante 3                        |
+| `docs/architektur.md`        | die Begründungen (Varianten 1 und 2)                 |
+| `v3/docs/architektur.md`     | die Begründungen (Variante 3)                        |
+| `docs/troubleshooting.md`    | Fehlersuche (Varianten 1 und 2)                      |
+| `v3/docs/troubleshooting.md` | Fehlersuche (Variante 3)                             |
+| `scripts/check-links.sh`     | prüft relative Links in der Doku                     |
+| `.github/workflows/ci.yml`   | shellcheck + Linkprüfung                             |
 
 ## Vor dem Commit
 
 Genau das, was die CI prüft:
 
 ```bash
-shellcheck devbox/devbox.sh solobox/solobox.sh scripts/check-links.sh
+shellcheck v1/devbox.sh v2/solobox.sh scripts/check-links.sh
 shellcheck v3/sbx-claude.sh v3/hooks/notify.sh v3/hooks/watch.sh
-bash -n devbox/devbox.conf.example
-bash -n solobox/solobox.conf.example
+bash -n v1/devbox.conf.example
+bash -n v2/solobox.conf.example
 bash -n v3/sbx-claude.conf.example
-test -x devbox/devbox.sh && test -x solobox/solobox.sh
+test -x v1/devbox.sh && test -x v2/solobox.sh
 test -x v3/sbx-claude.sh && test -x v3/hooks/watch.sh
 ./scripts/check-links.sh
 ```
@@ -197,16 +197,16 @@ ls "$ORDNER"     # erwartet: nur sbx-claude-t.ereignisse, keine zweite Datei
 ```
 
 Kein `shellcheck` zur Hand:
-`docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable /mnt/devbox/devbox.sh`
+`docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable /mnt/v1/devbox.sh`
 
 ## Nach Änderungen am Dockerfile
 
 ```bash
-./devbox/devbox.sh update
+./v1/devbox.sh update
 docker run --rm devbox/base:latest bash -lc 'python --version; pnpm --version'
 
 # Variante 2
-./solobox/solobox.sh update
+./v2/solobox.sh update
 docker run --rm solobox/base:latest bash -lc 'python --version; pnpm --version; gcc --version | head -1'
 
 # Variante 3

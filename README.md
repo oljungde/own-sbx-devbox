@@ -7,12 +7,12 @@ mounted in read-only instead of copied into every repository.
 
 > **Documentation is in German.** This project is course material for a
 > German-speaking workshop, so the tutorial under [`docs/`](docs/) and the
-> comments inside `devbox/Dockerfile` and `devbox/devbox.sh` are written in
+> comments inside `v1/Dockerfile` and `v1/devbox.sh` are written in
 > German by design. This README is the only English document.
 
 ## What you get
 
-The toolchain below describes `devbox/` (variant 1). `solobox/` and `v3/` ship
+The toolchain below describes `v1/` (variant 1). `v2/` and `v3/` ship
 their own Dockerfiles with the same core plus per-variant additions — see
 [Three variants](#three-variants).
 
@@ -34,17 +34,17 @@ git clone <your-fork> ~/dev/own/devbox
 cd ~/dev/own/devbox
 
 mkdir -p ~/.config/devbox
-cp devbox/devbox.conf.example ~/.config/devbox/devbox.conf
+cp v1/devbox.conf.example ~/.config/devbox/devbox.conf
 $EDITOR ~/.config/devbox/devbox.conf     # point WORKSPACES at your project root
 
-./devbox/devbox.sh doctor
-./devbox/devbox.sh build                 # builds the image, registers the template
-./devbox/devbox.sh up privat             # creates the sandbox and starts Claude
+./v1/devbox.sh doctor
+./v1/devbox.sh build                 # builds the image, registers the template
+./v1/devbox.sh up privat             # creates the sandbox and starts Claude
 ```
 
 Requires `sbx` and a **local** Docker daemon on the host — `sbx` alone does not
 need Docker Desktop, but devbox builds its own image with `docker build`, so it
-does. See [`docs/tutorial/00-vorbereitung.md`](docs/tutorial/00-vorbereitung.md)
+does. See [`docs/tutorial-v1/00-vorbereitung.md`](docs/tutorial-v1/00-vorbereitung.md)
 for installation on macOS, Linux and Windows.
 
 ## Platform support
@@ -59,35 +59,35 @@ for installation on macOS, Linux and Windows.
 repository in the WSL filesystem, not under `/mnt/c/`. Git Bash mostly works but
 rewrites paths to `/c/Users/...`, which surprises `sbx create` mount arguments.
 
-See [`docs/tutorial/`](docs/tutorial/) for the full walkthrough and
-[`docs/cheatsheet.md`](docs/cheatsheet.md) for every command on one page.
+See [`docs/tutorial-v1/`](docs/tutorial-v1/) for the full walkthrough and
+[`docs/cheatsheet-v1.md`](docs/cheatsheet-v1.md) for every command on one page.
 
 ## Three variants
 
 This repository ships **three** takes on the same idea. They share nothing but
 the `sbx` concepts underneath, and they can run side by side on one machine.
 
-|                        | `devbox/` (variant 1)          | `solobox/` (variant 2)              | `v3/` (variant 3)                    |
-| ---------------------- | ------------------------------ | ----------------------------------- | ------------------------------------ |
-| Sandboxes              | one per profile                | exactly one, machine-wide           | **one per project**, one shared image |
-| Invocation             | `./devbox/devbox.sh up privat` | `solobox up`, from inside a project | `sbx-claude up`, from inside a project |
-| Config file            | required                       | optional                            | optional                             |
-| Global skills / agents | opt-in per profile             | always on                           | always on (skills via `sbx skills`)  |
-| Global hooks & plugins | only via `SHARE_ALL`           | always on, filtered                 | plugins yes, hooks **replaced**      |
-| Claude starts in       | the primary workspace          | your current project directory      | your current project directory       |
-| Permission mode        | image default                  | `acceptEdits`                       | `bypassPermissions` **+ ask on git** |
-| Desktop notifications  | suppressed                     | suppressed                          | **works**, via a host watcher        |
+|                        | `v1/` (variant 1)          | `v2/` (variant 2)                   | `v3/` (variant 3)                      |
+| ---------------------- | -------------------------- | ----------------------------------- | -------------------------------------- |
+| Sandboxes              | one per profile            | exactly one, machine-wide           | **one per project**, one shared image  |
+| Invocation             | `./v1/devbox.sh up privat` | `solobox up`, from inside a project | `sbx-claude up`, from inside a project |
+| Config file            | required                   | optional                            | optional                               |
+| Global skills / agents | opt-in per profile         | always on                           | always on (skills via `sbx skills`)    |
+| Global hooks & plugins | only via `SHARE_ALL`       | always on, filtered                 | plugins yes, hooks **replaced**        |
+| Claude starts in       | the primary workspace      | your current project directory      | your current project directory         |
+| Permission mode        | image default              | `acceptEdits`                       | `bypassPermissions` **+ ask on git**   |
+| Desktop notifications  | suppressed                 | suppressed                          | **works**, via a host watcher          |
 
 Variant 2 exists for the case where you want your entire global Claude setup —
 skills, agents, commands, rules, hooks, plugins — available in every project
 without copying it anywhere, and you are willing to trade the isolation that
 separate profiles give you. Its tutorial is
-[`docs/tutorial-solo/`](docs/tutorial-solo/), its command reference
-[`docs/cheatsheet-solo.md`](docs/cheatsheet-solo.md).
+[`docs/tutorial-v2/`](docs/tutorial-v2/), its command reference
+[`docs/cheatsheet-v2.md`](docs/cheatsheet-v2.md).
 
 ```bash
-chmod +x solobox/solobox.sh
-./solobox/solobox.sh install     # symlink into ~/.local/bin
+chmod +x v2/solobox.sh
+./v2/solobox.sh install     # symlink into ~/.local/bin
 cd ~/dev/own/some-project
 solobox up                       # builds, creates the sandbox, starts Claude here
 ```
@@ -125,16 +125,16 @@ long-lived; your project files stay on the host and are bind-mounted in.
 ## Learn it, don't just run it
 
 This repository is the reference implementation. The tutorial in
-[`docs/tutorial/`](docs/tutorial/) walks you through building the same thing
+[`docs/tutorial-v1/`](docs/tutorial-v1/) walks you through building the same thing
 from an empty directory, in seven chapters that each end in a working state.
-Reading `devbox/devbox.sh` and `devbox/Dockerfile` top to bottom is the fastest
+Reading `v1/devbox.sh` and `v1/Dockerfile` top to bottom is the fastest
 way to understand what `sbx` actually does — every section is commented.
 
 ## Design notes
 
 - The wrapper deliberately uses **only stable `sbx` flags**. `sbx kit` and
   `sbx skills` are marked EXPERIMENTAL ("may change or be removed in future
-  releases"), so the declarative kit variant lives in `devbox/kit/kit.yaml` as
+  releases"), so the declarative kit variant lives in `v1/kit/kit.yaml` as
   an optional extra rather than in the critical path.
 - Network rules are applied with `--sandbox` scope only, never globally, so
   another `sbx` setup on the same machine is left untouched.
