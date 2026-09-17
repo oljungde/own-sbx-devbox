@@ -11,3 +11,5 @@ sbx-claude.conf
 
 # Temporäre Build-Artefakte
 *.tar
+
+.DS_Store
